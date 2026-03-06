@@ -13,6 +13,7 @@ import EmergencyPlans from './EmergencyPlans'
 import SafeWorkProcedures from './SafeWorkProcedures'
 import DOLOrders from './DOLOrders'
 import ResourcesAI from './ResourcesAI'
+import AIFloatingChat from '../AIFloatingChat'
 
 export default function Dashboard() {
   const [page, setPage] = useState('dashboard')
@@ -127,6 +128,8 @@ export default function Dashboard() {
         {page === 'dolorders' && <DOLOrders />}
         {page === 'resources' && <ResourcesAI />}
       </main>
+
+      <AIFloatingChat page={page} />
     </div>
   )
 }

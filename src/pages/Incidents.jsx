@@ -136,9 +136,10 @@ export default function Incidents() {
   }
 
   async function handleFormalClose(incId) {
-    const signedBy = wfVal(incId, 'hse_signed_by', incidents.find(i => i.id === incId)?.hse_signed_by || '')
-    const signedDate = wfVal(incId, 'hse_signed_date', incidents.find(i => i.id === incId)?.hse_signed_date || '')
-    const confirmed = wfVal(incId, 'closure_confirmed', incidents.find(i => i.id === incId)?.closure_confirmed || false)
+    const inc = incidents.find(i => i.id === incId)
+    const signedBy   = wfEdits[incId]?.hse_signed_by   ?? inc?.hse_signed_by   ?? ''
+    const signedDate = wfEdits[incId]?.hse_signed_date  ?? inc?.hse_signed_date  ?? ''
+    const confirmed  = wfEdits[incId]?.closure_confirmed ?? inc?.closure_confirmed ?? false
     if (!signedBy || !signedDate || !confirmed) {
       alert('Fill in all closure fields and confirm corrective actions are complete.'); return
     }

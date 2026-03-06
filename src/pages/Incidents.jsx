@@ -66,16 +66,14 @@ export default function Incidents() {
     fetchAll()
   }
 
-  async function handleCloseAction(id) {
-    const { data: { user } } = await supabase.auth.getUser()
-    await supabase.auth.getUser()
-    await supabase.from('corrective_actions').update({
-      status: 'closed',
-      closed_at: new Date().toISOString().split('T')[0],
-      closed_by: userData.user.email
-    }).eq('id', id)
-    fetchAll()
-  }
+async function handleCloseAction(id) {
+  await supabase.from('corrective_actions').update({
+    status: 'closed',
+    closed_at: new Date().toISOString().split('T')[0],
+    closed_by: 'HSE Manager'
+  }).eq('id', id)
+  fetchAll()
+}
 
   async function handleUpdateActionStatus(id, status) {
     await supabase.from('corrective_actions').update({ status }).eq('id', id)

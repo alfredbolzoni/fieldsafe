@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 // WCB Nova Scotia Construction Sector Benchmarks 2023
 const WCB_BENCHMARKS = {
@@ -14,6 +14,7 @@ export default function Analytics() {
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState('12')
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchStats() }, [period])
 
   async function fetchStats() {

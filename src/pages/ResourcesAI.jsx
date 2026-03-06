@@ -88,7 +88,12 @@ export default function ResourcesAI() {
     try {
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.REACT_APP_ANTHROPIC_KEY,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
           max_tokens: 1000,
@@ -98,21 +103,21 @@ export default function ResourcesAI() {
 - General OHS Regulations
 - Construction industry OHS requirements
 - JOHSC (Joint Occupational Health and Safety Committee) requirements
-- WCB Nova Scotia workers' compensation
+- WCB Nova Scotia workers compensation
 - WHMIS 2015 (GHS-aligned)
 - NS Department of Labour, Skills and Immigration enforcement
 
-You provide accurate, practical, and specific guidance. When citing the Act, reference specific sections (e.g., §13, §29, §43-45). Be concise but thorough. Format responses clearly with bullet points where helpful. Always note when something requires legal advice beyond your scope. Never give legal advice — give compliance information.
+You provide accurate, practical, and specific guidance. When citing the Act, reference specific sections (e.g., 13, 29, 43-45). Be concise but thorough. Format responses clearly with bullet points where helpful. Never give legal advice, give compliance information.
 
 Key facts:
 - OHS Policy required for 5+ employees
-- OHS Program required for 20+ employees  
+- OHS Program required for 20+ employees
 - JOHSC required for 20+ employees
 - Records kept minimum 5 years
 - Serious incidents must be reported to NS OHS within 24 hours
-- New Violence & Harassment requirements effective September 1, 2025
-- Right to refuse unsafe work: §43-45 (worker paid regular wages during refusal)
-- JOHSC employer response deadline: 21 days (§34)
+- New Violence and Harassment requirements effective September 1, 2025
+- Right to refuse unsafe work: 43-45 (worker paid regular wages during refusal)
+- JOHSC employer response deadline: 21 days (34)
 - NS OHS phone: 1-800-952-2687 (24/7)`,
           messages: newMessages.map(m => ({ role: m.role, content: m.content }))
         })
@@ -144,7 +149,6 @@ Key facts:
 
       {activeTab === 'chat' && (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          {/* Quick questions */}
           <div style={{ flexShrink: 0, marginBottom: 12 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 8 }}>Quick Questions</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -159,7 +163,6 @@ Key facts:
             </div>
           </div>
 
-          {/* Chat window */}
           <div style={{ flex: 1, overflowY: 'auto', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '20px 16px', minHeight: 0 }}>
             {messages.map((msg, i) => <MessageBubble key={i} msg={msg} />)}
             {loading && (
@@ -177,7 +180,6 @@ Key facts:
             <div ref={bottomRef} />
           </div>
 
-          {/* Input */}
           <div style={{ flexShrink: 0, display: 'flex', gap: 8, marginTop: 12 }}>
             <input
               ref={inputRef}

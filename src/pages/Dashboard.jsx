@@ -10,7 +10,12 @@ import WorkRefusal from './WorkRefusal'
 
 export default function Dashboard() {
   const [page, setPage] = useState('dashboard')
-  const [user, setUser] = useState(null)
+  const [userEmail, setUserEmail] = useState('')
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUserEmail(user.email)
+    })
+  }, [])
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => setUser(user))
@@ -73,8 +78,8 @@ export default function Dashboard() {
               {user?.email ? user.email.slice(0, 2).toUpperCase() : 'HS'}
             </div>
             <div>
-              <div className="user-name">{user?.email?.split('@')[0] || 'HSE Manager'}</div>
-              <div className="user-role">{user?.email || 'FieldSafe Pro'}</div>
+              <div className="user-name">HSE Manager</div>
+              <div className="user-role">{userEmail}</div>
             </div>
             <div className="online-dot" />
           </div>
@@ -136,7 +141,7 @@ const [, setLoading] = useState(true)
   const expiring = certs.filter(c => { if (!c.expiry_date) return false; const d = Math.floor((new Date(c.expiry_date) - today) / 86400000); return d >= 0 && d <= 30 }).length
   const expired = certs.filter(c => c.expiry_date && new Date(c.expiry_date) < today).length
   const lastLTI = incidents.filter(i => i.type === 'Time-Loss Injury').sort((a,b) => new Date(b.date)-new Date(a.date))[0]
-  const daysLTI = lastLTI ? Math.floor((today - new Date(lastLTI.date)) / 86400000) : 'None'
+  const daysLTI = lastLTI ? Math.floor((today - new Date(lastLTI.date)) / 86400000) : incidents.length > 0 ? Math.floor((today - new Date(incidents[incidents.length-1].date)) / 86400000) : '∞'
   const overdueActions = actions.filter(a => a.status !== 'closed' && new Date(a.due_date) < today).length
   const criticalHazards = hazards.filter(h => h.status === 'active' && h.risk_level === 'Critical').length
   const overdueHazardReview = hazards.filter(h => h.status === 'active' && h.review_date && new Date(h.review_date) < today).length

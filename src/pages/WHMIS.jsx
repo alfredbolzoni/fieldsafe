@@ -59,12 +59,6 @@ export default function WHMIS() {
     return Math.floor((new Date() - new Date(date)) / (86400000 * 365)) >= 3
   }
 
-  function isSdsExpiringSoon(date) {
-    if (!date) return false
-    const age = Math.floor((new Date() - new Date(date)) / (86400000 * 365))
-    return age >= 2.5 && age < 3
-  }
-
   const active = products.filter(p => p.status === 'active')
   const expiredSDS = active.filter(p => isSdsExpired(p.sds_date)).length
   const filtered = active

@@ -7,6 +7,12 @@ import Analytics from './Analytics'
 import Hazards from './Hazards'
 import JOHSC from './JOHSC'
 import WorkRefusal from './WorkRefusal'
+import Harassment from './Harassment'
+import WHMIS from './WHMIS'
+import EmergencyPlans from './EmergencyPlans'
+import SafeWorkProcedures from './SafeWorkProcedures'
+import DOLOrders from './DOLOrders'
+import ResourcesAI from './ResourcesAI'
 
 export default function Dashboard() {
   const [page, setPage] = useState('dashboard')
@@ -51,12 +57,20 @@ export default function Dashboard() {
               { id: 'hazards', label: 'Hazard Register', icon: <svg viewBox="0 0 15 15" fill="none"><path d="M7.5 1L14 13H1L7.5 1Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><path d="M7.5 6V9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><circle cx="7.5" cy="11" r="0.75" fill="currentColor"/></svg> },
               { id: 'workrefusal', label: 'Work Refusals', icon: <svg viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="6" stroke="currentColor" strokeWidth="1.3"/><path d="M5 5l5 5M10 5l-5 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
               { id: 'johsc', label: 'JOHSC', icon: <svg viewBox="0 0 15 15" fill="none"><path d="M2 4h11M2 8h11M2 12h6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
+              { id: 'harassment', label: 'Harassment', icon: <svg viewBox="0 0 15 15" fill="none"><path d="M7.5 1L14 13H1L7.5 1Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><path d="M7.5 5.5V8.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><circle cx="7.5" cy="10.5" r="0.75" fill="currentColor"/></svg> },
+              { id: 'whmis', label: 'WHMIS / SDS', icon: <svg viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="6" stroke="currentColor" strokeWidth="1.3"/><path d="M5 7.5h5M7.5 5v5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
+              { id: 'emergency', label: 'Emergency Plans', icon: <svg viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="6" stroke="currentColor" strokeWidth="1.3"/><path d="M7.5 4v4l2.5 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
+              { id: 'swp', label: 'Safe Work Procedures', icon: <svg viewBox="0 0 15 15" fill="none"><path d="M2 3.5h11M2 7.5h8M2 11.5h6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
+              { id: 'dolorders', label: 'DOL Orders', icon: <svg viewBox="0 0 15 15" fill="none"><path d="M2 2h11v11H2V2Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><path d="M5 5h5M5 8h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
             ]},
             { section: 'People', items: [
               { id: 'training', label: 'Training', icon: <svg viewBox="0 0 15 15" fill="none"><path d="M7.5 1L14 4.5L7.5 8L1 4.5L7.5 1Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><path d="M4 6.2V10.5C4 10.5 5.5 13 7.5 13C9.5 13 11 10.5 11 10.5V6.2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> },
             ]},
             { section: 'Insights', items: [
               { id: 'analytics', label: 'Analytics', icon: <svg viewBox="0 0 15 15" fill="none"><path d="M1.5 13.5L5.5 8.5L8.5 11L12.5 5.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/><circle cx="13" cy="5" r="1.2" fill="currentColor"/></svg> },
+            ]},
+            { section: 'Resources', items: [
+              { id: 'resources', label: 'NS OHS Resources & AI', icon: <svg viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="6" stroke="currentColor" strokeWidth="1.3"/><path d="M7.5 5v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><circle cx="7.5" cy="10.5" r="0.75" fill="currentColor"/></svg> },
             ]},
           ].map(group => (
             <div key={group.section} className="nav-section">
@@ -106,6 +120,12 @@ export default function Dashboard() {
         {page === 'hazards' && <Hazards />}
         {page === 'johsc' && <JOHSC />}
         {page === 'workrefusal' && <WorkRefusal />}
+        {page === 'harassment' && <Harassment />}
+        {page === 'whmis' && <WHMIS />}
+        {page === 'emergency' && <EmergencyPlans />}
+        {page === 'swp' && <SafeWorkProcedures />}
+        {page === 'dolorders' && <DOLOrders />}
+        {page === 'resources' && <ResourcesAI />}
       </main>
     </div>
   )

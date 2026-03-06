@@ -199,6 +199,7 @@ export default function Inspections() {
   if (view === 'active' && activeInspection) {
     const passed  = items.filter(i => i.result === 'pass').length
     const failed  = items.filter(i => i.result === 'fail').length
+    const na      = items.filter(i => i.result === 'na').length
     const pending = items.filter(i => i.result === 'pending').length
     const scored  = passed + failed
     const score   = scored > 0 ? Math.round((passed / scored) * 100) : 0

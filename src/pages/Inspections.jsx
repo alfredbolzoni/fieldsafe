@@ -135,7 +135,7 @@ export default function Inspections() {
     const score = passed + failed > 0 ? Math.round((passed / (passed + failed)) * 100) : 0
 
     return (
-      <div style={{ padding: 32, fontFamily: 'system-ui, sans-serif' }}>
+      <div className="page-wrap">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
           <div>
             <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>Active Inspection</h2>

@@ -85,7 +85,7 @@ export default function Analytics() {
   }
 
   return (
-    <div style={{ padding: 32, fontFamily: 'system-ui, sans-serif' }}>
+    <div className="page-wrap">
 
       {/* HEADER */}
       <div style={{ marginBottom: 24 }}>

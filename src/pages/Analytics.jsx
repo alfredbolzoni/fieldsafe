@@ -1,242 +1,277 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
+
+// WCB Nova Scotia Construction Sector Benchmarks 2023
+const WCB_BENCHMARKS = {
+  TRIR: 3.2,
+  LTIR: 1.8,
+  severity_rate: 28.4,
+}
 
 export default function Analytics() {
-  const [incidents, setIncidents] = useState([])
-  const [inspections, setInspections] = useState([])
-  const [workers, setWorkers] = useState([])
-  const [certs, setCerts] = useState([])
+  const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [period, setPeriod] = useState('12')
 
-  useEffect(() => { fetchAll() }, [])
+  useEffect(() => { fetchStats() }, [period])
 
-  async function fetchAll() {
+  async function fetchStats() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
-    const [{ data: inc }, { data: ins }, { data: wrk }, { data: cer }] = await Promise.all([
+    if (!user) return
+
+    const cutoff = new Date()
+    cutoff.setMonth(cutoff.getMonth() - parseInt(period))
+
+    const [{ data: inc }, { data: ins }, { data: wrk }, { data: cer }, { data: haz }, { data: act }] = await Promise.all([
       supabase.from('incidents').select('*').eq('user_id', user.id),
       supabase.from('inspections').select('*').eq('user_id', user.id),
       supabase.from('workers').select('*').eq('user_id', user.id),
       supabase.from('certifications').select('*').eq('user_id', user.id),
+      supabase.from('hazards').select('*').eq('user_id', user.id),
+      supabase.from('corrective_actions').select('*').eq('user_id', user.id),
     ])
-    setIncidents(inc || [])
-    setInspections(ins || [])
-    setWorkers(wrk || [])
-    setCerts(cer || [])
+
+    const incidents = inc || []
+    const inspections = ins || []
+    const workers = wrk || []
+    const certs = cer || []
+    const hazards = haz || []
+    const actions = act || []
+
+    // TRIR = (Number of recordable incidents × 200,000) / Total hours worked
+    // Assuming 2000 hours/worker/year
+    const totalHours = workers.length * 2000 * (parseInt(period) / 12)
+    const recordable = incidents.filter(i => ['Time-Loss Injury', 'Minor Injury'].includes(i.type))
+    const timeLoss = incidents.filter(i => i.type === 'Time-Loss Injury')
+    const TRIR = totalHours > 0 ? ((recordable.length * 200000) / totalHours).toFixed(2) : 0
+    const LTIR = totalHours > 0 ? ((timeLoss.length * 200000) / totalHours).toFixed(2) : 0
+
+    // Incident by type
+    const byType = {}
+    incidents.forEach(i => { byType[i.type] = (byType[i.type] || 0) + 1 })
+    const incidentsByType = Object.entries(byType).map(([type, count]) => ({ type, count }))
+
+    // Incident by severity
+    const bySeverity = {}
+    incidents.forEach(i => { bySeverity[i.severity] = (bySeverity[i.severity] || 0) + 1 })
+
+    // Monthly incidents (last 6 months)
+    const monthlyData = []
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date()
+      d.setMonth(d.getMonth() - i)
+      const month = d.toLocaleDateString('en-CA', { month: 'short', year: '2-digit' })
+      const monthInc = incidents.filter(inc => {
+        const incDate = new Date(inc.date)
+        return incDate.getMonth() === d.getMonth() && incDate.getFullYear() === d.getFullYear()
+      })
+      monthlyData.push({
+        month,
+        incidents: monthInc.length,
+        nearMiss: monthInc.filter(i => i.type === 'Near-Miss').length,
+        injuries: monthInc.filter(i => i.type.includes('Injury')).length,
+      })
+    }
+
+    // Inspection scores
+    const avgScore = inspections.length > 0
+      ? Math.round(inspections.reduce((s, i) => s + (i.score || 0), 0) / inspections.length) : 0
+
+    // Corrective action completion rate
+    const closedActions = actions.filter(a => a.status === 'closed').length
+    const caRate = actions.length > 0 ? Math.round((closedActions / actions.length) * 100) : 0
+
+    // Cert compliance
+    const today = new Date()
+    const expiredCerts = certs.filter(c => c.expiry_date && new Date(c.expiry_date) < today).length
+    const certCompliance = certs.length > 0 ? Math.round(((certs.length - expiredCerts) / certs.length) * 100) : 100
+
+    // Hazard by risk level
+    const hazardsByRisk = ['Critical', 'High', 'Medium', 'Low'].map(level => ({
+      level, count: hazards.filter(h => h.risk_level === level && h.status === 'active').length
+    }))
+
+    setStats({
+      TRIR, LTIR, totalHours: Math.round(totalHours),
+      recordable: recordable.length, timeLoss: timeLoss.length,
+      workers: workers.length, incidents: incidents.length,
+      incidentsByType, bySeverity, monthlyData,
+      avgScore, caRate, certCompliance,
+      hazardsByRisk, activeHazards: hazards.filter(h => h.status === 'active').length,
+      inspections: inspections.length,
+    })
     setLoading(false)
+  }
+
+  function ScoreCard({ label, value, benchmark, unit = '', higherIsBetter = false, description }) {
+    const numVal = parseFloat(value)
+    const numBench = parseFloat(benchmark)
+    const good = higherIsBetter ? numVal >= numBench : numVal <= numBench
+    const color = isNaN(numVal) || numVal === 0 ? 'var(--text-3)' : good ? 'var(--green)' : 'var(--red)'
+    return (
+      <div className="kpi-card" style={{ borderLeft: `3px solid ${color}` }}>
+        <div className="kpi-label">{label}</div>
+        <div className="kpi-value" style={{ color, fontSize: 28 }}>{value}{unit}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{description}</div>
+        {benchmark && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: color }} />
+            <span style={{ fontSize: 10, color: 'var(--text-3)' }}>WCB NS benchmark: {benchmark}{unit}</span>
+          </div>
+        )}
+      </div>
+    )
   }
 
   if (loading) return <div className="page-wrap"><div className="empty-state"><div className="empty-sub">Loading analytics...</div></div></div>
 
-  // ── CALCULATIONS ──
-  const openIncidents = incidents.filter(i => i.status === 'open').length
-  const closedIncidents = incidents.filter(i => i.status === 'closed').length
-  const timeLoss = incidents.filter(i => i.type === 'Time-Loss Injury').length
-
-  const totalWorkers = workers.length || 1
-  const trir = totalWorkers > 0 ? ((incidents.length / (totalWorkers * 200000)) * 200000).toFixed(1) : 0
-  const ltir = totalWorkers > 0 ? ((timeLoss / (totalWorkers * 200000)) * 200000).toFixed(1) : 0
-
-  const avgScore = inspections.length > 0
-    ? Math.round(inspections.reduce((sum, i) => sum + (i.score || 0), 0) / inspections.length)
-    : 0
-  const passedInspections = inspections.filter(i => i.status === 'passed').length
-
-  const today = new Date()
-  const expiredCerts = certs.filter(c => c.expiry_date && new Date(c.expiry_date) < today).length
-  const expiringCerts = certs.filter(c => {
-    if (!c.expiry_date) return false
-    const days = Math.floor((new Date(c.expiry_date) - today) / (1000 * 60 * 60 * 24))
-    return days >= 0 && days <= 30
-  }).length
-  const validCerts = certs.filter(c => c.expiry_date && new Date(c.expiry_date) > today).length
-  const trainingCompliance = certs.length > 0 ? Math.round((validCerts / certs.length) * 100) : 0
-
-  // Days without LTI
-  const lastLTI = incidents
-    .filter(i => i.type === 'Time-Loss Injury')
-    .sort((a, b) => new Date(b.date) - new Date(a.date))[0]
-  const daysWithoutLTI = lastLTI
-    ? Math.floor((today - new Date(lastLTI.date)) / (1000 * 60 * 60 * 24))
-    : incidents.length > 0 ? 'No LTI' : '—'
-
-  // Incidents by type
-  const byType = ['Near-Miss', 'Minor Injury', 'Time-Loss Injury', 'Property Damage', 'Hazard Observation']
-    .map(type => ({ type, count: incidents.filter(i => i.type === type).length }))
-    .filter(t => t.count > 0)
-
-  // Monthly trend (last 6 months)
-  const months = []
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date()
-    d.setMonth(d.getMonth() - i)
-    const label = d.toLocaleString('default', { month: 'short' })
-    const year = d.getFullYear()
-    const month = String(d.getMonth() + 1).padStart(2, '0')
-    const count = incidents.filter(inc => inc.date && inc.date.startsWith(`${year}-${month}`)).length
-    months.push({ label, count })
-  }
-  const maxMonth = Math.max(...months.map(m => m.count), 1)
-
-  function scoreColor(score) {
-    if (score >= 80) return 'var(--green)'
-    if (score >= 60) return 'var(--amber)'
-    return 'var(--red)'
-  }
-
   return (
     <div className="page-wrap">
-
       <div className="page-header">
         <div>
           <h1 className="page-title">Analytics & Benchmarks</h1>
-          <p className="page-sub">Real-time KPIs · WCB Nova Scotia construction avg: TRIR 3.2 · LTIR 2.1</p>
+          <p className="page-sub">TRIR · LTIR · WCB Nova Scotia Construction Sector benchmarks</p>
         </div>
-      </div>
-
-      {/* KPI STRIP */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 24 }}>
-        {[
-          { label: 'Open Incidents', value: openIncidents, color: openIncidents > 0 ? 'var(--red)' : 'var(--green)', delta: `${closedIncidents} closed` },
-          { label: 'TRIR', value: trir, color: parseFloat(trir) <= 3.2 ? 'var(--green)' : 'var(--red)', delta: 'NS avg: 3.2' },
-          { label: 'Days Without LTI', value: daysWithoutLTI, color: 'var(--green)', delta: `${timeLoss} total LTI` },
-          { label: 'Training Compliance', value: `${trainingCompliance}%`, color: trainingCompliance >= 80 ? 'var(--green)' : 'var(--amber)', delta: `${expiringCerts} expiring` },
-        ].map((k, i) => (
-          <div key={i} className="kpi-card">
-            <div className="kpi-label">{k.label}</div>
-            <div className="kpi-value" style={{ color: k.color }}>{k.value}</div>
-            <div className="kpi-delta">{k.delta}</div>
-          </div>
-        ))}
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-
-        {/* MONTHLY TREND */}
-        <div className="card" style={{ padding: 20 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Monthly Incident Trend</div>
-          <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 16 }}>Last 6 months</div>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 100 }}>
-            {months.map((m, i) => (
-              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, height: '100%', justifyContent: 'flex-end' }}>
-                <div style={{ fontSize: 10, color: 'var(--text-2)', fontWeight: 600 }}>{m.count || ''}</div>
-                <div style={{
-                  width: '100%',
-                  height: m.count > 0 ? `${Math.round((m.count / maxMonth) * 80)}px` : '4px',
-                  background: m.count > 0 ? 'var(--primary)' : 'var(--border)',
-                  borderRadius: '4px 4px 0 0',
-                  minHeight: 4
-                }} />
-                <div style={{ fontSize: 10, color: 'var(--text-3)' }}>{m.label}</div>
-              </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <div className="tabs" style={{ marginBottom: 0 }}>
+            {[{ id: '3', label: '3 months' }, { id: '6', label: '6 months' }, { id: '12', label: '12 months' }].map(p => (
+              <button key={p.id} className={`tab-btn ${period === p.id ? 'active' : ''}`} onClick={() => setPeriod(p.id)}>{p.label}</button>
             ))}
           </div>
         </div>
+      </div>
 
-        {/* VS WCB BENCHMARK */}
-        <div className="card" style={{ padding: 20 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Your Rates vs WCB NS</div>
-          <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 16 }}>Construction sector · 2023 official data</div>
-          <table className="fs-table">
-            <thead>
-              <tr>
-                <th>Metric</th>
-                <th>Your Site</th>
-                <th>NS Avg</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                { metric: 'TRIR', yours: trir, avg: '3.2', better: parseFloat(trir) <= 3.2 },
-                { metric: 'LTIR', yours: ltir, avg: '2.1', better: parseFloat(ltir) <= 2.1 },
-                { metric: 'Injury Rate /100', yours: incidents.length > 0 ? (incidents.length / totalWorkers * 100).toFixed(1) : '0', avg: '2.10', better: (incidents.length / totalWorkers * 100) <= 2.1 },
-                { metric: 'Training %', yours: `${trainingCompliance}%`, avg: '~70%', better: trainingCompliance >= 70 },
-              ].map((row, i) => (
-                <tr key={i}>
-                  <td style={{ fontWeight: 600 }}>{row.metric}</td>
-                  <td style={{ fontWeight: 800, color: row.better ? 'var(--green)' : 'var(--red)' }}>{row.yours}</td>
-                  <td style={{ color: 'var(--text-2)' }}>{row.avg}</td>
-                  <td>
-                    <span className={`pill ${row.better ? 'pill-green' : 'pill-red'}`}>
-                      {row.better ? '✓ Better' : '✗ Above avg'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* WCB BENCHMARK ALERT */}
+      {stats && (parseFloat(stats.TRIR) > WCB_BENCHMARKS.TRIR || parseFloat(stats.LTIR) > WCB_BENCHMARKS.LTIR) && (
+        <div style={{ background: 'var(--red-light)', border: '1px solid rgba(197,48,48,0.2)', borderLeft: '3px solid var(--red)', borderRadius: 6, padding: '10px 14px', marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--red)', marginBottom: 2 }}>⚠ Above WCB Nova Scotia Benchmark</div>
+          <div style={{ fontSize: 11, color: 'var(--text-2)' }}>Your incident rates exceed the NS construction sector average. Review corrective actions and hazard controls.</div>
+        </div>
+      )}
+
+      {/* RATE CARDS */}
+      <div style={{ marginBottom: 6 }}>
+        <div className="section-divider"><span className="section-divider-label">Incident Rates</span><div className="section-divider-line" /></div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 24 }}>
+        {stats && <>
+          <ScoreCard label="TRIR" value={stats.TRIR} benchmark={WCB_BENCHMARKS.TRIR} description="Total Recordable Incident Rate" />
+          <ScoreCard label="LTIR" value={stats.LTIR} benchmark={WCB_BENCHMARKS.LTIR} description="Lost Time Incident Rate" />
+          <ScoreCard label="Inspection Score" value={`${stats.avgScore}`} benchmark="80" unit="%" higherIsBetter description="Avg site inspection score" />
+          <ScoreCard label="CA Completion" value={`${stats.caRate}`} benchmark="90" unit="%" higherIsBetter description="Corrective actions closed" />
+        </>}
+      </div>
+
+      {/* COMPLIANCE CARDS */}
+      <div style={{ marginBottom: 6 }}>
+        <div className="section-divider"><span className="section-divider-label">Compliance Overview</span><div className="section-divider-line" /></div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 24 }}>
+        {stats && <>
+          <ScoreCard label="Cert Compliance" value={`${stats.certCompliance}`} benchmark="100" unit="%" higherIsBetter description="Workers with valid certs" />
+          <ScoreCard label="Active Hazards" value={stats.activeHazards} description="Open in hazard register" />
+          <ScoreCard label="Total Hours" value={stats.totalHours.toLocaleString()} description={`Est. based on ${stats.workers} workers`} />
+          <ScoreCard label="Inspections Done" value={stats.inspections} description={`In last ${period} months`} />
+        </>}
+      </div>
+
+      {/* CHARTS */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+
+        {/* Monthly Incidents */}
+        <div className="card">
+          <div className="card-title">Monthly Incidents — Last 6 Months</div>
+          <div className="card-sub">Near-misses vs injuries by month</div>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={stats?.monthlyData || []} barSize={12}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--text-3)' }} />
+              <YAxis tick={{ fontSize: 10, fill: 'var(--text-3)' }} allowDecimals={false} />
+              <Tooltip contentStyle={{ fontSize: 11, border: '1px solid var(--border)', borderRadius: 6 }} />
+              <Bar dataKey="nearMiss" name="Near-Miss" fill="#b7791f" radius={[3,3,0,0]} />
+              <Bar dataKey="injuries" name="Injuries" fill="#c53030" radius={[3,3,0,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Hazards by Risk */}
+        <div className="card">
+          <div className="card-title">Active Hazards by Risk Level</div>
+          <div className="card-sub">Current hazard register distribution</div>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={stats?.hazardsByRisk || []} barSize={28} layout="vertical">
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--text-3)' }} allowDecimals={false} />
+              <YAxis dataKey="level" type="category" tick={{ fontSize: 10, fill: 'var(--text-3)' }} width={55} />
+              <Tooltip contentStyle={{ fontSize: 11, border: '1px solid var(--border)', borderRadius: 6 }} />
+              <Bar dataKey="count" name="Hazards" radius={[0,3,3,0]}
+                fill="#1a6faf"
+                label={{ position: 'right', fontSize: 10, fill: 'var(--text-3)' }} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-
-        {/* INCIDENTS BY TYPE */}
-        <div className="card" style={{ padding: 20 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Incidents by Type</div>
-          <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 16 }}>All time</div>
-          {incidents.length === 0 ? (
-            <div style={{ textAlign: 'center', color: 'var(--text-3)', fontSize: 13, padding: 20 }}>No incidents yet</div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {byType.map((t, i) => {
-                const colors = ['var(--blue)', 'var(--primary)', 'var(--red)', 'var(--purple)', 'var(--green)']
-                return (
-                  <div key={i}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <span style={{ fontSize: 12, fontWeight: 600 }}>{t.type}</span>
-                      <span style={{ fontSize: 12, fontWeight: 800, color: colors[i % colors.length] }}>{t.count}</span>
-                    </div>
-                    <div style={{ height: 6, background: 'var(--surface-2)', borderRadius: 99, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${(t.count / incidents.length) * 100}%`, background: colors[i % colors.length], borderRadius: 99 }} />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* INSPECTION SCORES */}
-        <div className="card" style={{ padding: 20 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Inspection Performance</div>
-          <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 16 }}>All inspections</div>
-          <div style={{ textAlign: 'center', marginBottom: 16 }}>
-            <div style={{ fontSize: 48, fontWeight: 800, color: scoreColor(avgScore), letterSpacing: '-2px' }}>{avgScore}%</div>
-            <div style={{ fontSize: 12, color: 'var(--text-2)' }}>Average score</div>
-          </div>
+      {/* TRIR vs BENCHMARK */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-title">TRIR vs WCB NS Benchmark — {period}-Month View</div>
+        <div className="card-sub">Total Recordable Incident Rate compared to Nova Scotia construction sector average of {WCB_BENCHMARKS.TRIR}</div>
+        <div style={{ marginTop: 16 }}>
           {[
-            { label: 'Total Inspections', value: inspections.length, color: 'var(--blue)' },
-            { label: 'Passed (≥80%)', value: passedInspections, color: 'var(--green)' },
-            { label: 'Action Required', value: inspections.filter(i => i.status === 'action-required').length, color: 'var(--amber)' },
-            { label: 'Failed (<60%)', value: inspections.filter(i => i.status === 'failed').length, color: 'var(--red)' },
-          ].map((s, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: '1px solid var(--border)' }}>
-              <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{s.label}</span>
-              <span style={{ fontSize: 13, fontWeight: 800, color: s.color }}>{s.value}</span>
+            { label: 'Your TRIR', value: parseFloat(stats?.TRIR || 0), max: Math.max(parseFloat(stats?.TRIR || 0), WCB_BENCHMARKS.TRIR) * 1.5, color: parseFloat(stats?.TRIR || 0) <= WCB_BENCHMARKS.TRIR ? 'var(--green)' : 'var(--red)' },
+            { label: 'WCB NS Benchmark', value: WCB_BENCHMARKS.TRIR, max: Math.max(parseFloat(stats?.TRIR || 0), WCB_BENCHMARKS.TRIR) * 1.5, color: 'var(--primary)' },
+            { label: 'Your LTIR', value: parseFloat(stats?.LTIR || 0), max: Math.max(parseFloat(stats?.LTIR || 0), WCB_BENCHMARKS.LTIR) * 1.5, color: parseFloat(stats?.LTIR || 0) <= WCB_BENCHMARKS.LTIR ? 'var(--green)' : 'var(--red)' },
+            { label: 'WCB NS LTIR Benchmark', value: WCB_BENCHMARKS.LTIR, max: Math.max(parseFloat(stats?.LTIR || 0), WCB_BENCHMARKS.LTIR) * 1.5, color: 'var(--primary)' },
+          ].map((item, i) => (
+            <div key={i} className="progress-row">
+              <div className="progress-label">{item.label}</div>
+              <div className="progress-track">
+                <div className="progress-fill" style={{ width: item.max > 0 ? `${Math.min((item.value / item.max) * 100, 100)}%` : '0%', background: item.color }} />
+              </div>
+              <div className="progress-val">{item.value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* INCIDENT BREAKDOWN */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div className="card">
+          <div className="card-title">Incidents by Type</div>
+          <div className="card-sub">All time</div>
+          {stats?.incidentsByType?.length === 0 ? (
+            <div style={{ fontSize: 12, color: 'var(--text-3)', padding: '16px 0' }}>No incidents recorded</div>
+          ) : stats?.incidentsByType?.map((item, i) => (
+            <div key={i} className="progress-row">
+              <div className="progress-label">{item.type}</div>
+              <div className="progress-track">
+                <div className="progress-fill" style={{ width: `${(item.count / (stats?.incidents || 1)) * 100}%`, background: 'var(--primary)' }} />
+              </div>
+              <div className="progress-val">{item.count}</div>
             </div>
           ))}
         </div>
 
-        {/* TRAINING COMPLIANCE */}
-        <div className="card" style={{ padding: 20 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Training Compliance</div>
-          <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 16 }}>Certifications status</div>
-          <div style={{ textAlign: 'center', marginBottom: 16 }}>
-            <div style={{ fontSize: 48, fontWeight: 800, color: trainingCompliance >= 80 ? 'var(--green)' : 'var(--amber)', letterSpacing: '-2px' }}>{trainingCompliance}%</div>
-            <div style={{ fontSize: 12, color: 'var(--text-2)' }}>Valid certifications</div>
-          </div>
-          {[
-            { label: 'Valid', value: validCerts, color: 'var(--green)' },
-            { label: 'Expiring (30 days)', value: expiringCerts, color: 'var(--amber)' },
-            { label: 'Expired', value: expiredCerts, color: 'var(--red)' },
-            { label: 'Total Workers', value: workers.length, color: 'var(--blue)' },
-          ].map((s, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: '1px solid var(--border)' }}>
-              <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{s.label}</span>
-              <span style={{ fontSize: 13, fontWeight: 800, color: s.color }}>{s.value}</span>
-            </div>
-          ))}
+        <div className="card">
+          <div className="card-title">Severity Distribution</div>
+          <div className="card-sub">All time</div>
+          {Object.keys(stats?.bySeverity || {}).length === 0 ? (
+            <div style={{ fontSize: 12, color: 'var(--text-3)', padding: '16px 0' }}>No incidents recorded</div>
+          ) : ['Critical', 'High', 'Medium', 'Low'].map((sev, i) => {
+            const count = stats?.bySeverity?.[sev] || 0
+            const colors = { Critical: 'var(--red)', High: 'var(--orange)', Medium: 'var(--amber)', Low: 'var(--green)' }
+            return (
+              <div key={i} className="progress-row">
+                <div className="progress-label">{sev}</div>
+                <div className="progress-track">
+                  <div className="progress-fill" style={{ width: `${(count / (stats?.incidents || 1)) * 100}%`, background: colors[sev] }} />
+                </div>
+                <div className="progress-val">{count}</div>
+              </div>
+            )
+          })}
         </div>
       </div>
     </div>

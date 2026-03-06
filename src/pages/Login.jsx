@@ -51,8 +51,11 @@ export default function Login() {
             background: '#f5a623', borderRadius: 10, padding: '7px 13px',
             marginBottom: 20
           }}>
-            <span style={{ fontSize: 16 }}></span>
-            <b style={{ fontSize: 14, fontWeight: 700, color: '#1d1d1f' }}>FieldSafe</b>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M8 1L14 4V8C14 11.3 11.3 14.2 8 15C4.7 14.2 2 11.3 2 8V4L8 1Z" fill="#1a1200" fillOpacity="0.9"/>
+             <path d="M6 8L7.5 9.5L10.5 6.5" stroke="#1a1200" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <b style={{ fontSize: 14, fontWeight: 700, color: '#1a1200' }}>FieldSafe</b>
           </div>
           <h1 style={{ fontSize: 24, fontWeight: 700, color: '#fff', letterSpacing: '-0.5px', marginBottom: 6 }}>
             Welcome back

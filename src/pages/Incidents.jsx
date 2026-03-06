@@ -39,15 +39,26 @@ export default function Incidents() {
   }
 
   async function handleSubmit() {
-    if (!form.description || !form.location || !form.reported_by) { alert('Please fill all fields'); return }
-    setSubmitting(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('incidents').insert([{ ...form, user_id: user.id }])
-    setForm({ date: new Date().toISOString().split('T')[0], type: 'Near-Miss', description: '', location: '', reported_by: '', severity: 'Low' })
-    setShowForm(false)
-    setSubmitting(false)
-    fetchAll()
+  if (!form.description || !form.location || !form.reported_by) {
+    alert('Please fill all fields'); return
   }
+  setSubmitting(true)
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const classification = classifyIncident(form.type, form.severity)
+  await supabase.from('incidents').insert([{
+    ...form,
+    user_id: user.id,
+    ns_ohs_class: classification.class,
+    notification_required: classification.notificationRequired,
+    notification_deadline: classification.deadline
+  }])
+
+  setForm({ date: new Date().toISOString().split('T')[0], type: 'Near-Miss', description: '', location: '', reported_by: '', severity: 'Low' })
+  setShowForm(false)
+  setSubmitting(false)
+  fetchAll()
+}
 
   async function handleClose(id) {
     await supabase.from('incidents').update({ status: 'closed' }).eq('id', id)
@@ -94,6 +105,31 @@ async function handleCloseAction(id) {
     if (days === 0) return 'Due today'
     return `${days}d remaining`
   }
+
+  function classifyIncident(type, severity) {
+  if (type === 'Time-Loss Injury' && severity === 'Critical') {
+    return { class: 'Critical Injury', notificationRequired: true, deadline: '24 hours — NS OHS §63' }
+  }
+  if (type === 'Time-Loss Injury') {
+    return { class: 'Time-Loss Injury', notificationRequired: true, deadline: '3 days — NS OHS §63' }
+  }
+  if (type === 'Minor Injury' && (severity === 'High' || severity === 'Critical')) {
+    return { class: 'Medical Aid Injury', notificationRequired: true, deadline: 'Internal record — NS OHS §62' }
+  }
+  if (type === 'Minor Injury') {
+    return { class: 'First Aid Injury', notificationRequired: false, deadline: 'Internal record only' }
+  }
+  if (type === 'Near-Miss') {
+    return { class: 'Near-Miss', notificationRequired: false, deadline: 'Internal record only' }
+  }
+  if (type === 'Hazard Observation') {
+    return { class: 'Hazard', notificationRequired: false, deadline: 'Log in Hazard Register' }
+  }
+  if (type === 'Property Damage') {
+    return { class: 'Property Damage', notificationRequired: severity === 'High' || severity === 'Critical', deadline: severity === 'High' ? 'Internal record — review required' : 'Internal record only' }
+  }
+  return { class: 'General Incident', notificationRequired: false, deadline: 'Internal record only' }
+}
 
   const sevPill = { Low: 'pill-green', Medium: 'pill-amber', High: 'pill-orange', Critical: 'pill-red' }
   const priorityPill = { Low: 'pill-green', Medium: 'pill-amber', High: 'pill-orange', Critical: 'pill-red' }
@@ -184,6 +220,7 @@ async function handleCloseAction(id) {
                 <th>Reported By</th>
                 <th>Severity</th>
                 <th>Actions</th>
+                <th>NS OHS Class</th>
                 <th>Status</th>
                 <th></th>
               </tr>
@@ -224,6 +261,27 @@ async function handleCloseAction(id) {
                             onClick={() => { setSelectedIncident(inc.id); setShowActionForm(true) }}
                           >+ Add</button>
                         </div>
+                      </td>
+                      <td>
+                        {inc.ns_ohs_class ? (
+                          <div>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: inc.notification_required ? 'var(--red)' : 'var(--text-2)', marginBottom: 2 }}>
+                              {inc.ns_ohs_class}
+                            </div>
+                            {inc.notification_required && (
+                              <div style={{ fontSize: 10, color: 'var(--orange)', fontWeight: 600 }}>
+                                ⚠ {inc.notification_deadline}
+                              </div>
+                            )}
+                            {!inc.notification_required && (
+                              <div style={{ fontSize: 10, color: 'var(--text-3)' }}>
+                                {inc.notification_deadline}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: 11, color: 'var(--text-3)' }}>—</span>
+                        )}
                       </td>
                       <td><span className={`pill ${inc.status === 'open' ? 'pill-red' : 'pill-green'}`}>{inc.status === 'open' ? 'Open' : 'Closed'}</span></td>
                       <td>
@@ -361,11 +419,28 @@ async function handleCloseAction(id) {
               </div>
             </div>
 
-            {form.type === 'Time-Loss Injury' && (
-              <div className="alert alert-warn" style={{ marginTop: 4 }}>
+            {form.type !== 'Near-Miss' && form.type !== 'Hazard Observation' && (
+              <div className={`alert ${
+                (form.type === 'Time-Loss Injury' || (form.type === 'Minor Injury' && (form.severity === 'High' || form.severity === 'Critical')))
+                  ? 'alert-warn' : 'alert-info'
+              }`} style={{ marginTop: 4 }}>
                 <div>
-                  <div className="alert-title">⚠ NS OHS Notification Required</div>
-                  <div className="alert-body">Time-Loss Injuries must be reported to NS Department of Labour & Advanced Education within 24 hours under the Occupational Health and Safety Act.</div>
+                  {(() => {
+                    const c = classifyIncident(form.type, form.severity)
+                    return (
+                      <>
+                        <div className="alert-title">
+                          {c.notificationRequired ? '⚠ ' : 'ℹ '}
+                          NS OHS Classification: {c.class}
+                        </div>
+                        <div className="alert-body">
+                          {c.notificationRequired
+                            ? `Notification required: ${c.deadline}`
+                            : c.deadline}
+                        </div>
+                      </>
+                    )
+                  })()}
                 </div>
               </div>
             )}

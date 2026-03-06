@@ -629,7 +629,7 @@ export default function Incidents() {
                                     <label className="form-label">HSE Manager Name</label>
                                     <input
                                       className="form-input"
-                                      value={wfVal(inc.id, 'hse_signed_by', inc.hse_signed_by || '')}
+                                      value={wfEdits[inc.id]?.hse_signed_by ?? inc.hse_signed_by ?? ''}
                                       onChange={e => setWfField(inc.id, 'hse_signed_by', e.target.value)}
                                       placeholder="Full name"
                                       disabled={inc.hse_signed_by && inc.closure_confirmed}
@@ -640,7 +640,7 @@ export default function Incidents() {
                                     <input
                                       type="date"
                                       className="form-input"
-                                      value={wfVal(inc.id, 'hse_signed_date', inc.hse_signed_date || new Date().toISOString().split('T')[0])}
+                                      value={wfEdits[inc.id]?.hse_signed_date ?? inc.hse_signed_date ?? new Date().toISOString().split('T')[0]}
                                       onChange={e => setWfField(inc.id, 'hse_signed_date', e.target.value)}
                                       disabled={inc.hse_signed_by && inc.closure_confirmed}
                                     />
@@ -651,7 +651,7 @@ export default function Incidents() {
                                   <input
                                     type="checkbox"
                                     id={`confirm-${inc.id}`}
-                                    checked={wfVal(inc.id, 'closure_confirmed', inc.closure_confirmed || false)}
+                                    checked={wfEdits[inc.id]?.closure_confirmed ?? inc.closure_confirmed ?? false}
                                     onChange={e => setWfField(inc.id, 'closure_confirmed', e.target.checked)}
                                     disabled={inc.hse_signed_by && inc.closure_confirmed}
                                     style={{ width: 15, height: 15, cursor: 'pointer' }}

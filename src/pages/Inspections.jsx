@@ -109,32 +109,23 @@ export default function Inspections() {
     await supabase.from('inspection_items').insert(itemsToInsert)
 
     setSaving(false)
-    setView('new')  // reset before fetching
     setActiveInspection(inspection)
-    await fetchInspection(inspection.id, user.id)
+    await fetchInspection(inspection.id)
     setView('active')
     fetchInspections()
   }
 
-  async function fetchInspection(id, userId) {
-    let uid = userId
-    if (!uid) {
-      const { data: { user } } = await supabase.auth.getUser()
-      uid = user.id
-    }
-    const { data, error } = await supabase
+  async function fetchInspection(id) {
+    const { data } = await supabase
       .from('inspection_items')
       .select('*')
       .eq('inspection_id', id)
-      .eq('user_id', uid)
-      .order('created_at')
-    if (!error && data) setItems(data)
+    setItems(data || [])
   }
 
   async function resumeInspection(ins) {
-    const { data: { user } } = await supabase.auth.getUser()
     setActiveInspection(ins)
-    await fetchInspection(ins.id, user.id)
+    await fetchInspection(ins.id)
     setView('active')
   }
 

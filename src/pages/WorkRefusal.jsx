@@ -85,7 +85,10 @@ export default function WorkRefusal() {
           <h1 className="page-title">Work Refusal Register</h1>
           <p className="page-sub">Right to refuse unsafe work · NS OHS Act §43–45 · Formal investigation workflow</p>
         </div>
-        <button className="btn btn-primary" onClick={() => { setForm(emptyForm); setShowForm(true) }}>+ Log Refusal</button>
+        <div className="page-actions">
+          <ExportPDFButton moduleKey="work_refusals" rows={refusals} />
+          <button className="btn btn-primary" onClick={() => { setForm(emptyForm); setShowForm(true) }}>+ Log Refusal</button>
+        </div>
       </div>
 
       <div className="alert alert-info" style={{ marginBottom: 16 }}>

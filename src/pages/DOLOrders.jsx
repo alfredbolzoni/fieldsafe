@@ -71,7 +71,10 @@ export default function DOLOrders() {
           <h1 className="page-title">Department of Labour Orders</h1>
           <p className="page-sub">NS OHS Officer orders · Must be posted at workplace · NS OHS Act §56</p>
         </div>
-        <button className="btn btn-primary" onClick={() => { setForm(emptyForm); setShowForm(true) }}>+ Log Order</button>
+        <div className="page-actions">
+          <ExportPDFButton moduleKey="dol_orders" rows={orders} />
+          <button className="btn btn-primary" onClick={() => { setForm(emptyForm); setShowForm(true) }}>+ Log Order</button>
+        </div>
       </div>
 
       <div className="alert alert-warn" style={{ marginBottom: 16 }}>

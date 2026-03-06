@@ -68,7 +68,10 @@ export default function SafeWorkProcedures() {
           <h1 className="page-title">Safe Work Procedures</h1>
           <p className="page-sub">Written SWPs for high-risk tasks · NS OHS Act — required for all non-routine tasks</p>
         </div>
-        <button className="btn btn-primary" onClick={() => { setForm(emptyForm); setEditSwp(null); setShowForm(true) }}>+ New SWP</button>
+        <div className="page-actions">
+          <ExportPDFButton moduleKey="safe_work_procedures" rows={swps} />
+          <button className="btn btn-primary" onClick={() => { setForm(emptyForm); setEditSwp(null); setShowForm(true) }}>+ New SWP</button>
+        </div>
       </div>
 
       <div className="alert alert-info" style={{ marginBottom: 16 }}>

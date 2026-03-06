@@ -217,7 +217,10 @@ export default function Inspections() {
           <h1 className="page-title">Site Inspections</h1>
           <p className="page-sub">Daily checklists · NS OHS Act compliant · Auto-scored</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setView('new')}>+ Start Inspection</button>
+        <div className="page-actions">
+          <ExportPDFButton moduleKey="inspections" rows={inspections} />
+          <button className="btn btn-primary" onClick={() => setView('new')}>+ Start Inspection</button>
+        </div>
       </div>
 
       {/* NEW INSPECTION FORM */}

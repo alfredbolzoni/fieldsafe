@@ -75,7 +75,10 @@ export default function WHMIS() {
           <h1 className="page-title">WHMIS / SDS Register</h1>
           <p className="page-sub">Workplace Hazardous Materials · Safety Data Sheets · WHMIS 2015 GHS-aligned</p>
         </div>
-        <button className="btn btn-primary" onClick={() => { setForm(emptyForm); setEditProduct(null); setShowForm(true) }}>+ Add Product</button>
+        <div className="page-actions">
+          <ExportPDFButton moduleKey="whmis_products" rows={products} />
+          <button className="btn btn-primary" onClick={() => { setForm(emptyForm); setEditProduct(null); setShowForm(true) }}>+ Add Product</button>
+        </div>
       </div>
 
       <div className="alert alert-info" style={{ marginBottom: 16 }}>

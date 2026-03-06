@@ -67,7 +67,10 @@ export default function EmergencyPlans() {
           <h1 className="page-title">Emergency Response Plans</h1>
           <p className="page-sub">Fire · Medical · Chemical Spill · Evacuation · NS OHS Act compliant</p>
         </div>
-        <button className="btn btn-primary" onClick={() => { setForm(emptyForm); setEditPlan(null); setShowForm(true) }}>+ Add Plan</button>
+        <div className="page-actions">
+          <ExportPDFButton moduleKey="emergency_plans" rows={plans} />
+          <button className="btn btn-primary" onClick={() => { setForm(emptyForm); setEditPlan(null); setShowForm(true) }}>+ Add Plan</button>
+        </div>
       </div>
 
       <div className="alert alert-info" style={{ marginBottom: 16 }}>

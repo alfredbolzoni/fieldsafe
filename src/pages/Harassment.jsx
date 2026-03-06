@@ -75,7 +75,10 @@ export default function Harassment() {
           <h1 className="page-title">Violence & Harassment</h1>
           <p className="page-sub">Workplace harassment reporting · NS OHS Act §13 · Updated requirements September 2025</p>
         </div>
-        <button className="btn btn-primary" onClick={() => { setForm(emptyForm); setShowForm(true) }}>+ Report Incident</button>
+        <div className="page-actions">
+          <ExportPDFButton moduleKey="harassment_incidents" rows={incidents} />
+          <button className="btn btn-primary" onClick={() => { setForm(emptyForm); setShowForm(true) }}>+ Report Incident</button>
+        </div>
       </div>
 
       <div className="alert alert-warn" style={{ marginBottom: 16 }}>

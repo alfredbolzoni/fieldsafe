@@ -4,6 +4,13 @@ import ExportPDFButton from '../ExportPDFButton'
 
 const PRIORITIES = ['Low', 'Medium', 'High', 'Critical']
 
+const PHASES = [
+  { label: 'Assignment',          short: '1' },
+  { label: 'Investigation',       short: '2' },
+  { label: 'Corrective Actions',  short: '3' },
+  { label: 'Formal Closure',      short: '4' },
+]
+
 export default function Incidents() {
   const [incidents, setIncidents] = useState([])
   const [actions, setActions] = useState([])
@@ -14,6 +21,11 @@ export default function Incidents() {
   const [expandedIncident, setExpandedIncident] = useState(null)
   const [tab, setTab] = useState('open')
   const [submitting, setSubmitting] = useState(false)
+
+  // Workflow state
+  const [activePhase, setActivePhase] = useState({})   // { incId: 0|1|2|3 }
+  const [wfEdits, setWfEdits] = useState({})            // { incId: { field: value } }
+  const [savingWf, setSavingWf] = useState(false)
 
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -40,26 +52,24 @@ export default function Incidents() {
   }
 
   async function handleSubmit() {
-  if (!form.description || !form.location || !form.reported_by) {
-    alert('Please fill all fields'); return
+    if (!form.description || !form.location || !form.reported_by) {
+      alert('Please fill all fields'); return
+    }
+    setSubmitting(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    const classification = classifyIncident(form.type, form.severity)
+    await supabase.from('incidents').insert([{
+      ...form,
+      user_id: user.id,
+      ns_ohs_class: classification.class,
+      notification_required: classification.notificationRequired,
+      notification_deadline: classification.deadline
+    }])
+    setForm({ date: new Date().toISOString().split('T')[0], type: 'Near-Miss', description: '', location: '', reported_by: '', severity: 'Low' })
+    setShowForm(false)
+    setSubmitting(false)
+    fetchAll()
   }
-  setSubmitting(true)
-  const { data: { user } } = await supabase.auth.getUser()
-
-  const classification = classifyIncident(form.type, form.severity)
-  await supabase.from('incidents').insert([{
-    ...form,
-    user_id: user.id,
-    ns_ohs_class: classification.class,
-    notification_required: classification.notificationRequired,
-    notification_deadline: classification.deadline
-  }])
-
-  setForm({ date: new Date().toISOString().split('T')[0], type: 'Near-Miss', description: '', location: '', reported_by: '', severity: 'Low' })
-  setShowForm(false)
-  setSubmitting(false)
-  fetchAll()
-}
 
   async function handleClose(id) {
     await supabase.from('incidents').update({ status: 'closed' }).eq('id', id)
@@ -90,26 +100,85 @@ export default function Incidents() {
     fetchAll()
   }
 
-async function handleCloseAction(id) {
-  await supabase.from('corrective_actions').update({
-    status: 'closed',
-    closed_at: new Date().toISOString().split('T')[0],
-    closed_by: 'HSE Manager'
-  }).eq('id', id)
-  fetchAll()
-}
+  async function handleCloseAction(id) {
+    await supabase.from('corrective_actions').update({
+      status: 'closed',
+      closed_at: new Date().toISOString().split('T')[0],
+      closed_by: 'HSE Manager'
+    }).eq('id', id)
+    fetchAll()
+  }
 
   async function handleUpdateActionStatus(id, status) {
     await supabase.from('corrective_actions').update({ status }).eq('id', id)
     fetchAll()
   }
 
+  // ── Workflow helpers ──────────────────────────────────────────────
+
+  function wfVal(incId, field, fallback = '') {
+    return wfEdits[incId]?.[field] !== undefined ? wfEdits[incId][field] : fallback
+  }
+
+  function setWfField(incId, field, value) {
+    setWfEdits(prev => ({ ...prev, [incId]: { ...(prev[incId] || {}), [field]: value } }))
+  }
+
+  async function handleSaveWf(incId, fields) {
+    setSavingWf(true)
+    const updates = {}
+    fields.forEach(f => { if (wfEdits[incId]?.[f] !== undefined) updates[f] = wfEdits[incId][f] })
+    if (Object.keys(updates).length > 0) {
+      await supabase.from('incidents').update(updates).eq('id', incId)
+      await fetchAll()
+    }
+    setSavingWf(false)
+  }
+
+  async function handleFormalClose(incId) {
+    const signedBy = wfVal(incId, 'hse_signed_by', incidents.find(i => i.id === incId)?.hse_signed_by || '')
+    const signedDate = wfVal(incId, 'hse_signed_date', incidents.find(i => i.id === incId)?.hse_signed_date || '')
+    const confirmed = wfVal(incId, 'closure_confirmed', incidents.find(i => i.id === incId)?.closure_confirmed || false)
+    if (!signedBy || !signedDate || !confirmed) {
+      alert('Fill in all closure fields and confirm corrective actions are complete.'); return
+    }
+    setSavingWf(true)
+    await supabase.from('incidents').update({
+      hse_signed_by: signedBy,
+      hse_signed_date: signedDate,
+      closure_confirmed: confirmed,
+      status: 'closed'
+    }).eq('id', incId)
+    await fetchAll()
+    setSavingWf(false)
+  }
+
+  function getPhaseComplete(inc, incActions) {
+    return [
+      !!inc.assignee,
+      !!inc.root_cause,
+      incActions.length > 0 && incActions.every(a => a.status === 'closed'),
+      !!(inc.hse_signed_by && inc.closure_confirmed),
+    ]
+  }
+
+  function handleExpandIncident(inc, incActions) {
+    if (expandedIncident === inc.id) { setExpandedIncident(null); return }
+    setExpandedIncident(inc.id)
+    // Jump to first incomplete phase
+    const complete = getPhaseComplete(inc, incActions)
+    const first = complete.findIndex(c => !c)
+    setActivePhase(prev => ({ ...prev, [inc.id]: first === -1 ? 3 : first }))
+  }
+
+  // ── Misc helpers ──────────────────────────────────────────────────
+
   function getActionsForIncident(incidentId) {
     return actions.filter(a => a.incident_id === incidentId)
   }
 
   function isOverdue(dueDate) {
-    return new Date(dueDate) < new Date() 
+    return new Date(dueDate) < new Date()
   }
 
   function daysUntil(dueDate) {
@@ -120,29 +189,15 @@ async function handleCloseAction(id) {
   }
 
   function classifyIncident(type, severity) {
-  if (type === 'Time-Loss Injury' && severity === 'Critical') {
-    return { class: 'Critical Injury', notificationRequired: true, deadline: '24 hours — NS OHS §63' }
+    if (type === 'Time-Loss Injury' && severity === 'Critical') return { class: 'Critical Injury', notificationRequired: true, deadline: '24 hours — NS OHS §63' }
+    if (type === 'Time-Loss Injury') return { class: 'Time-Loss Injury', notificationRequired: true, deadline: '3 days — NS OHS §63' }
+    if (type === 'Minor Injury' && (severity === 'High' || severity === 'Critical')) return { class: 'Medical Aid Injury', notificationRequired: true, deadline: 'Internal record — NS OHS §62' }
+    if (type === 'Minor Injury') return { class: 'First Aid Injury', notificationRequired: false, deadline: 'Internal record only' }
+    if (type === 'Near-Miss') return { class: 'Near-Miss', notificationRequired: false, deadline: 'Internal record only' }
+    if (type === 'Hazard Observation') return { class: 'Hazard', notificationRequired: false, deadline: 'Log in Hazard Register' }
+    if (type === 'Property Damage') return { class: 'Property Damage', notificationRequired: severity === 'High' || severity === 'Critical', deadline: severity === 'High' ? 'Internal record — review required' : 'Internal record only' }
+    return { class: 'General Incident', notificationRequired: false, deadline: 'Internal record only' }
   }
-  if (type === 'Time-Loss Injury') {
-    return { class: 'Time-Loss Injury', notificationRequired: true, deadline: '3 days — NS OHS §63' }
-  }
-  if (type === 'Minor Injury' && (severity === 'High' || severity === 'Critical')) {
-    return { class: 'Medical Aid Injury', notificationRequired: true, deadline: 'Internal record — NS OHS §62' }
-  }
-  if (type === 'Minor Injury') {
-    return { class: 'First Aid Injury', notificationRequired: false, deadline: 'Internal record only' }
-  }
-  if (type === 'Near-Miss') {
-    return { class: 'Near-Miss', notificationRequired: false, deadline: 'Internal record only' }
-  }
-  if (type === 'Hazard Observation') {
-    return { class: 'Hazard', notificationRequired: false, deadline: 'Log in Hazard Register' }
-  }
-  if (type === 'Property Damage') {
-    return { class: 'Property Damage', notificationRequired: severity === 'High' || severity === 'Critical', deadline: severity === 'High' ? 'Internal record — review required' : 'Internal record only' }
-  }
-  return { class: 'General Incident', notificationRequired: false, deadline: 'Internal record only' }
-}
 
   const sevPill = { Low: 'pill-green', Medium: 'pill-amber', High: 'pill-orange', Critical: 'pill-red' }
   const priorityPill = { Low: 'pill-green', Medium: 'pill-amber', High: 'pill-orange', Critical: 'pill-red' }
@@ -206,9 +261,9 @@ async function handleCloseAction(id) {
       {/* TABS */}
       <div className="tabs">
         {[
-          { id: 'open', label: `Open (${incidents.filter(i=>i.status==='open').length})` },
+          { id: 'open',   label: `Open (${incidents.filter(i=>i.status==='open').length})` },
           { id: 'closed', label: `Closed (${incidents.filter(i=>i.status==='closed').length})` },
-          { id: 'all', label: `All (${incidents.length})` },
+          { id: 'all',    label: `All (${incidents.length})` },
         ].map(t => (
           <button key={t.id} className={`tab-btn ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>
         ))}
@@ -243,13 +298,15 @@ async function handleCloseAction(id) {
                 const openAct = incActions.filter(a => a.status !== 'closed')
                 const overdueAct = incActions.filter(a => a.status !== 'closed' && isOverdue(a.due_date))
                 const isExpanded = expandedIncident === inc.id
+                const phaseComplete = getPhaseComplete(inc, incActions)
+                const doneCount = phaseComplete.filter(Boolean).length
 
                 return (
                   <>
                     <tr key={inc.id} style={{ background: isExpanded ? 'var(--surface-2)' : undefined }}>
                       <td>
                         <button
-                          onClick={() => setExpandedIncident(isExpanded ? null : inc.id)}
+                          onClick={() => handleExpandIncident(inc, incActions)}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', fontSize: 10, padding: '2px 4px', borderRadius: 3, fontFamily: 'Inter' }}
                         >
                           {isExpanded ? '▼' : '▶'}
@@ -268,11 +325,6 @@ async function handleCloseAction(id) {
                             {incActions.length === 0 ? '—' : `${openAct.length} open`}
                           </span>
                           {overdueAct.length > 0 && <span className="pill pill-red" style={{ fontSize: 9 }}>OVERDUE</span>}
-                          <button
-                            className="btn btn-ghost"
-                            style={{ padding: '3px 8px', fontSize: 10 }}
-                            onClick={() => { setSelectedIncident(inc.id); setShowActionForm(true) }}
-                          >+ Add</button>
                         </div>
                       </td>
                       <td>
@@ -282,21 +334,22 @@ async function handleCloseAction(id) {
                               {inc.ns_ohs_class}
                             </div>
                             {inc.notification_required && (
-                              <div style={{ fontSize: 10, color: 'var(--orange)', fontWeight: 600 }}>
-                                ⚠ {inc.notification_deadline}
-                              </div>
+                              <div style={{ fontSize: 10, color: 'var(--orange)', fontWeight: 600 }}>⚠ {inc.notification_deadline}</div>
                             )}
                             {!inc.notification_required && (
-                              <div style={{ fontSize: 10, color: 'var(--text-3)' }}>
-                                {inc.notification_deadline}
-                              </div>
+                              <div style={{ fontSize: 10, color: 'var(--text-3)' }}>{inc.notification_deadline}</div>
                             )}
                           </div>
                         ) : (
                           <span style={{ fontSize: 11, color: 'var(--text-3)' }}>—</span>
                         )}
                       </td>
-                      <td><span className={`pill ${inc.status === 'open' ? 'pill-red' : 'pill-green'}`}>{inc.status === 'open' ? 'Open' : 'Closed'}</span></td>
+                      <td>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                          <span className={`pill ${inc.status === 'open' ? 'pill-red' : 'pill-green'}`}>{inc.status === 'open' ? 'Open' : 'Closed'}</span>
+                          <span style={{ fontSize: 10, color: 'var(--text-3)', textAlign: 'center' }}>{doneCount}/4 phases</span>
+                        </div>
+                      </td>
                       <td>
                         <div style={{ display: 'flex', gap: 4 }}>
                           {inc.status === 'open'
@@ -308,66 +361,331 @@ async function handleCloseAction(id) {
                       </td>
                     </tr>
 
-                    {/* EXPANDED — corrective actions */}
+                    {/* EXPANDED — 4-phase workflow dossier */}
                     {isExpanded && (
                       <tr key={`${inc.id}-expanded`}>
                         <td colSpan={9} style={{ padding: 0, background: 'var(--surface-2)', borderBottom: '2px solid var(--border)' }}>
-                          <div style={{ padding: '12px 16px 16px 36px' }}>
-                            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 10 }}>
-                              Corrective Actions
-                            </div>
 
-                            {incActions.length === 0 ? (
-                              <div style={{ fontSize: 12, color: 'var(--text-3)', fontStyle: 'italic', padding: '8px 0' }}>
-                                No corrective actions assigned — <button
-                                  onClick={() => { setSelectedIncident(inc.id); setShowActionForm(true) }}
-                                  style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: 0 }}>
-                                  Add one now
-                                </button>
-                              </div>
-                            ) : (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                {incActions.map(action => (
-                                  <div key={action.id} style={{
-                                    background: 'var(--surface)', border: '1px solid var(--border)',
-                                    borderLeft: `3px solid ${action.status === 'closed' ? 'var(--green)' : isOverdue(action.due_date) ? 'var(--red)' : 'var(--amber)'}`,
-                                    borderRadius: 6, padding: '10px 14px',
-                                    display: 'flex', alignItems: 'center', gap: 14
+                          {/* STEPPER HEADER */}
+                          <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
+                            {PHASES.map((phase, idx) => {
+                              const done = phaseComplete[idx]
+                              const active = (activePhase[inc.id] ?? 0) === idx
+                              return (
+                                <button
+                                  key={idx}
+                                  onClick={() => setActivePhase(prev => ({ ...prev, [inc.id]: idx }))}
+                                  style={{
+                                    flex: 1,
+                                    padding: '10px 8px',
+                                    border: 'none',
+                                    borderBottom: active ? '2px solid var(--primary)' : '2px solid transparent',
+                                    background: active ? 'var(--surface-2)' : 'transparent',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: 6,
+                                    transition: 'background 0.12s',
+                                  }}
+                                >
+                                  <span style={{
+                                    width: 20, height: 20, borderRadius: '50%', fontSize: 10, fontWeight: 700,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                                    background: done ? 'var(--green)' : active ? 'var(--primary)' : 'var(--border-strong)',
+                                    color: done || active ? '#fff' : 'var(--text-3)',
                                   }}>
-                                    <div style={{ flex: 1 }}>
-                                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 3 }}>{action.description}</div>
-                                      <div style={{ fontSize: 11, color: 'var(--text-2)' }}>
-                                        Assigned to <b>{action.assigned_to}</b> · Due {action.due_date} ·{' '}
-                                        <span style={{ color: action.status === 'closed' ? 'var(--green)' : isOverdue(action.due_date) ? 'var(--red)' : 'var(--amber)', fontWeight: 600 }}>
-                                          {action.status === 'closed' ? 'Completed' : daysUntil(action.due_date)}
-                                        </span>
-                                      </div>
-                                      {action.notes && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 3 }}>{action.notes}</div>}
-                                    </div>
-                                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
-                                      <span className={`pill ${priorityPill[action.priority] || 'pill-gray'}`}>{action.priority}</span>
-                                      {action.status !== 'closed' && (
-                                        <>
-                                          {action.status === 'open' && (
-                                            <button className="btn btn-ghost" style={{ padding: '3px 9px', fontSize: 10 }}
-                                              onClick={() => handleUpdateActionStatus(action.id, 'in-progress')}>
-                                              Start
-                                            </button>
-                                          )}
-                                          <button className="btn btn-secondary" style={{ padding: '3px 9px', fontSize: 10 }}
-                                            onClick={() => handleCloseAction(action.id)}>
-                                            ✓ Done
-                                          </button>
-                                        </>
-                                      )}
-                                      {action.status === 'closed' && (
-                                        <span className="pill pill-green">Closed</span>
-                                      )}
-                                    </div>
+                                    {done ? '✓' : phase.short}
+                                  </span>
+                                  <span style={{ fontSize: 11, fontWeight: 600, color: active ? 'var(--text-1)' : done ? 'var(--green)' : 'var(--text-3)' }}>
+                                    {phase.label}
+                                  </span>
+                                </button>
+                              )
+                            })}
+                          </div>
+
+                          {/* PHASE CONTENT */}
+                          <div style={{ padding: '16px 24px 20px 24px' }}>
+
+                            {/* ── PHASE 1: ASSIGNMENT ── */}
+                            {(activePhase[inc.id] ?? 0) === 0 && (
+                              <div>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 12 }}>
+                                  Case Assignment — who manages this incident?
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, maxWidth: 540 }}>
+                                  <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">Responsible Person</label>
+                                    <input
+                                      className="form-input"
+                                      value={wfVal(inc.id, 'assignee', inc.assignee || '')}
+                                      onChange={e => setWfField(inc.id, 'assignee', e.target.value)}
+                                      placeholder="Full name"
+                                    />
                                   </div>
-                                ))}
+                                  <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">Date Taken Over</label>
+                                    <input
+                                      type="date"
+                                      className="form-input"
+                                      value={wfVal(inc.id, 'assignee_date', inc.assignee_date || '')}
+                                      onChange={e => setWfField(inc.id, 'assignee_date', e.target.value)}
+                                    />
+                                  </div>
+                                </div>
+                                {inc.assignee && (
+                                  <div style={{ marginTop: 12, fontSize: 12, color: 'var(--green)', fontWeight: 600 }}>
+                                    Currently assigned to {inc.assignee}{inc.assignee_date ? ` · taken over ${inc.assignee_date}` : ''}
+                                  </div>
+                                )}
+                                <div style={{ marginTop: 14, display: 'flex', gap: 8 }}>
+                                  <button
+                                    className="btn btn-primary"
+                                    style={{ padding: '6px 18px', fontSize: 12 }}
+                                    disabled={savingWf}
+                                    onClick={() => handleSaveWf(inc.id, ['assignee', 'assignee_date'])}
+                                  >
+                                    {savingWf ? 'Saving...' : 'Save Assignment'}
+                                  </button>
+                                  {phaseComplete[0] && (
+                                    <button className="btn btn-ghost" style={{ padding: '6px 14px', fontSize: 12 }}
+                                      onClick={() => setActivePhase(prev => ({ ...prev, [inc.id]: 1 }))}>
+                                      Next: Investigation →
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             )}
+
+                            {/* ── PHASE 2: INVESTIGATION ── */}
+                            {(activePhase[inc.id] ?? 0) === 1 && (
+                              <div>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 12 }}>
+                                  Investigation — root cause analysis
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 680 }}>
+                                  <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">Root Cause *</label>
+                                    <textarea
+                                      className="form-input"
+                                      style={{ minHeight: 64 }}
+                                      value={wfVal(inc.id, 'root_cause', inc.root_cause || '')}
+                                      onChange={e => setWfField(inc.id, 'root_cause', e.target.value)}
+                                      placeholder="What was the fundamental cause of this incident?"
+                                    />
+                                  </div>
+                                  <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">Contributing Factors</label>
+                                    <textarea
+                                      className="form-input"
+                                      style={{ minHeight: 56 }}
+                                      value={wfVal(inc.id, 'contributing_factors', inc.contributing_factors || '')}
+                                      onChange={e => setWfField(inc.id, 'contributing_factors', e.target.value)}
+                                      placeholder="Environmental, organisational, human factors..."
+                                    />
+                                  </div>
+                                  <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">Witnesses</label>
+                                    <input
+                                      className="form-input"
+                                      value={wfVal(inc.id, 'witnesses', inc.witnesses || '')}
+                                      onChange={e => setWfField(inc.id, 'witnesses', e.target.value)}
+                                      placeholder="Names of witnesses present"
+                                    />
+                                  </div>
+                                  <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">Investigation Notes</label>
+                                    <textarea
+                                      className="form-input"
+                                      style={{ minHeight: 56 }}
+                                      value={wfVal(inc.id, 'investigation_notes', inc.investigation_notes || '')}
+                                      onChange={e => setWfField(inc.id, 'investigation_notes', e.target.value)}
+                                      placeholder="Additional findings, interviews conducted, documentation reviewed..."
+                                    />
+                                  </div>
+                                </div>
+                                <div style={{ marginTop: 14, display: 'flex', gap: 8 }}>
+                                  <button
+                                    className="btn btn-primary"
+                                    style={{ padding: '6px 18px', fontSize: 12 }}
+                                    disabled={savingWf}
+                                    onClick={() => handleSaveWf(inc.id, ['root_cause', 'contributing_factors', 'witnesses', 'investigation_notes'])}
+                                  >
+                                    {savingWf ? 'Saving...' : 'Save Investigation'}
+                                  </button>
+                                  {phaseComplete[1] && (
+                                    <button className="btn btn-ghost" style={{ padding: '6px 14px', fontSize: 12 }}
+                                      onClick={() => setActivePhase(prev => ({ ...prev, [inc.id]: 2 }))}>
+                                      Next: Corrective Actions →
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* ── PHASE 3: CORRECTIVE ACTIONS ── */}
+                            {(activePhase[inc.id] ?? 0) === 2 && (
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                                    Corrective Actions
+                                  </div>
+                                  <button
+                                    className="btn btn-secondary"
+                                    style={{ padding: '4px 12px', fontSize: 11 }}
+                                    onClick={() => { setSelectedIncident(inc.id); setShowActionForm(true) }}
+                                  >
+                                    + Add Action
+                                  </button>
+                                </div>
+
+                                {incActions.length === 0 ? (
+                                  <div style={{ fontSize: 12, color: 'var(--text-3)', fontStyle: 'italic', padding: '8px 0' }}>
+                                    No corrective actions assigned yet.
+                                  </div>
+                                ) : (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 720 }}>
+                                    {incActions.map(action => (
+                                      <div key={action.id} style={{
+                                        background: 'var(--surface)', border: '1px solid var(--border)',
+                                        borderLeft: `3px solid ${action.status === 'closed' ? 'var(--green)' : isOverdue(action.due_date) ? 'var(--red)' : 'var(--amber)'}`,
+                                        borderRadius: 6, padding: '10px 14px',
+                                        display: 'flex', alignItems: 'center', gap: 14
+                                      }}>
+                                        <div style={{ flex: 1 }}>
+                                          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 3 }}>{action.description}</div>
+                                          <div style={{ fontSize: 11, color: 'var(--text-2)' }}>
+                                            Assigned to <b>{action.assigned_to}</b> · Due {action.due_date} ·{' '}
+                                            <span style={{ color: action.status === 'closed' ? 'var(--green)' : isOverdue(action.due_date) ? 'var(--red)' : 'var(--amber)', fontWeight: 600 }}>
+                                              {action.status === 'closed' ? 'Completed' : daysUntil(action.due_date)}
+                                            </span>
+                                          </div>
+                                          {action.notes && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 3 }}>{action.notes}</div>}
+                                        </div>
+                                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+                                          <span className={`pill ${priorityPill[action.priority] || 'pill-gray'}`}>{action.priority}</span>
+                                          {action.status !== 'closed' && (
+                                            <>
+                                              {action.status === 'open' && (
+                                                <button className="btn btn-ghost" style={{ padding: '3px 9px', fontSize: 10 }}
+                                                  onClick={() => handleUpdateActionStatus(action.id, 'in-progress')}>
+                                                  Start
+                                                </button>
+                                              )}
+                                              <button className="btn btn-secondary" style={{ padding: '3px 9px', fontSize: 10 }}
+                                                onClick={() => handleCloseAction(action.id)}>
+                                                ✓ Done
+                                              </button>
+                                            </>
+                                          )}
+                                          {action.status === 'closed' && (
+                                            <span className="pill pill-green">Closed</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {phaseComplete[2] && (
+                                  <div style={{ marginTop: 14 }}>
+                                    <button className="btn btn-ghost" style={{ padding: '6px 14px', fontSize: 12 }}
+                                      onClick={() => setActivePhase(prev => ({ ...prev, [inc.id]: 3 }))}>
+                                      Next: Formal Closure →
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* ── PHASE 4: FORMAL CLOSURE ── */}
+                            {(activePhase[inc.id] ?? 0) === 3 && (
+                              <div>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 12 }}>
+                                  Formal Closure — HSE Manager sign-off
+                                </div>
+
+                                {/* Prerequisites checklist */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16, padding: '12px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, maxWidth: 480 }}>
+                                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 4 }}>Prerequisites</div>
+                                  {[
+                                    { label: 'Case assigned', done: phaseComplete[0] },
+                                    { label: 'Investigation complete', done: phaseComplete[1] },
+                                    { label: 'All corrective actions closed', done: phaseComplete[2] },
+                                  ].map((req, i) => (
+                                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                                      <span style={{ width: 16, height: 16, borderRadius: '50%', background: req.done ? 'var(--green)' : 'var(--border-strong)', color: req.done ? '#fff' : 'var(--text-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, flexShrink: 0 }}>
+                                        {req.done ? '✓' : '!'}
+                                      </span>
+                                      <span style={{ color: req.done ? 'var(--text-2)' : 'var(--text-3)' }}>{req.label}</span>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, maxWidth: 540 }}>
+                                  <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">HSE Manager Name</label>
+                                    <input
+                                      className="form-input"
+                                      value={wfVal(inc.id, 'hse_signed_by', inc.hse_signed_by || '')}
+                                      onChange={e => setWfField(inc.id, 'hse_signed_by', e.target.value)}
+                                      placeholder="Full name"
+                                      disabled={inc.hse_signed_by && inc.closure_confirmed}
+                                    />
+                                  </div>
+                                  <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">Closure Date</label>
+                                    <input
+                                      type="date"
+                                      className="form-input"
+                                      value={wfVal(inc.id, 'hse_signed_date', inc.hse_signed_date || new Date().toISOString().split('T')[0])}
+                                      onChange={e => setWfField(inc.id, 'hse_signed_date', e.target.value)}
+                                      disabled={inc.hse_signed_by && inc.closure_confirmed}
+                                    />
+                                  </div>
+                                </div>
+
+                                <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <input
+                                    type="checkbox"
+                                    id={`confirm-${inc.id}`}
+                                    checked={wfVal(inc.id, 'closure_confirmed', inc.closure_confirmed || false)}
+                                    onChange={e => setWfField(inc.id, 'closure_confirmed', e.target.checked)}
+                                    disabled={inc.hse_signed_by && inc.closure_confirmed}
+                                    style={{ width: 15, height: 15, cursor: 'pointer' }}
+                                  />
+                                  <label htmlFor={`confirm-${inc.id}`} style={{ fontSize: 12, color: 'var(--text-2)', cursor: 'pointer' }}>
+                                    I confirm all corrective actions are complete and this incident is ready for formal closure
+                                  </label>
+                                </div>
+
+                                {inc.hse_signed_by && inc.closure_confirmed ? (
+                                  <div style={{ marginTop: 14, padding: '10px 14px', background: 'var(--surface)', border: '1px solid var(--green)', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 10, maxWidth: 480 }}>
+                                    <span style={{ fontSize: 18, color: 'var(--green)' }}>✓</span>
+                                    <div>
+                                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)' }}>Formally closed</div>
+                                      <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Signed by {inc.hse_signed_by} · {inc.hse_signed_date}</div>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div style={{ marginTop: 14 }}>
+                                    <button
+                                      className="btn btn-primary"
+                                      style={{ padding: '6px 18px', fontSize: 12 }}
+                                      disabled={savingWf || !phaseComplete[0] || !phaseComplete[1] || !phaseComplete[2]}
+                                      onClick={() => handleFormalClose(inc.id)}
+                                    >
+                                      {savingWf ? 'Saving...' : 'Sign & Close Incident'}
+                                    </button>
+                                    {(!phaseComplete[0] || !phaseComplete[1] || !phaseComplete[2]) && (
+                                      <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 6 }}>Complete all prerequisites before formal closure.</div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
                           </div>
                         </td>
                       </tr>
@@ -446,15 +764,8 @@ async function handleCloseAction(id) {
                     const c = classifyIncident(form.type, form.severity)
                     return (
                       <>
-                        <div className="alert-title">
-                          {c.notificationRequired ? '⚠ ' : 'ℹ '}
-                          NS OHS Classification: {c.class}
-                        </div>
-                        <div className="alert-body">
-                          {c.notificationRequired
-                            ? `Notification required: ${c.deadline}`
-                            : c.deadline}
-                        </div>
+                        <div className="alert-title">{c.notificationRequired ? '⚠ ' : 'ℹ '}NS OHS Classification: {c.class}</div>
+                        <div className="alert-body">{c.notificationRequired ? `Notification required: ${c.deadline}` : c.deadline}</div>
                       </>
                     )
                   })()}

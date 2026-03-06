@@ -38,6 +38,19 @@ export default function Training() {
     fetchAll()
   }
 
+  async function deleteWorker(id) {
+    if (!window.confirm('Delete this worker and all their certifications?')) return
+    await supabase.from('certifications').delete().eq('worker_id', id)
+    await supabase.from('workers').delete().eq('id', id)
+    fetchAll()
+  }
+
+  async function deleteCert(id) {
+    if (!window.confirm('Delete this certification?')) return
+    await supabase.from('certifications').delete().eq('id', id)
+    fetchAll()
+  }
+
   async function addCert() {
     if (!selectedWorker || !certForm.expiry_date) { alert('Select worker and expiry date'); return }
     const { data: { user } } = await supabase.auth.getUser()
@@ -145,6 +158,10 @@ export default function Training() {
                       onClick={() => { setSelectedWorker(worker.id); setShowCertForm(true) }}>
                       + Cert
                     </button>
+                    <button className="btn btn-ghost" style={{ padding: '5px 12px', fontSize: 11, color: 'var(--red)' }}
+                      onClick={() => deleteWorker(worker.id)}>
+                      Delete
+                    </button>
                   </div>
                 </div>
                 {workerCerts.length > 0 && (
@@ -158,11 +175,18 @@ export default function Training() {
                         unknown: { bg: 'var(--bg)', text: 'var(--text-2)', border: 'var(--border)' },
                       }[s]
                       return (
-                        <div key={cert.id} style={{ background: style.bg, border: `1px solid ${style.border}`, borderRadius: 8, padding: '6px 12px' }}>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: style.text }}>{cert.name}</div>
-                          <div style={{ fontSize: 10, color: style.text, opacity: 0.8, marginTop: 2 }}>
-                            {cert.expiry_date} · {daysUntil(cert.expiry_date)}
+                        <div key={cert.id} style={{ background: style.bg, border: `1px solid ${style.border}`, borderRadius: 8, padding: '6px 12px', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                          <div>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: style.text }}>{cert.name}</div>
+                            <div style={{ fontSize: 10, color: style.text, opacity: 0.8, marginTop: 2 }}>
+                              {cert.expiry_date} · {daysUntil(cert.expiry_date)}
+                            </div>
                           </div>
+                          <button onClick={() => deleteCert(cert.id)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: style.text, opacity: 0.5, fontSize: 11, padding: '0 2px', lineHeight: 1, marginTop: 1 }}
+                            title="Delete certification">
+                            ✕
+                          </button>
                         </div>
                       )
                     })}

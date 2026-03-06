@@ -77,6 +77,12 @@ export default function Hazards() {
     fetchHazards()
   }
 
+  async function handleDelete(id) {
+    if (!window.confirm('Delete this hazard? This cannot be undone.')) return
+    await supabase.from('hazards').delete().eq('id', id)
+    fetchHazards()
+  }
+
   function openEdit(hazard) {
     setForm({ ...hazard })
     setEditHazard(hazard)
@@ -231,6 +237,7 @@ export default function Hazards() {
                         ? <button className="btn btn-ghost" style={{ padding: '3px 8px', fontSize: 10 }} onClick={() => handleClose(h.id)}>Resolve</button>
                         : <button className="btn btn-ghost" style={{ padding: '3px 8px', fontSize: 10 }} onClick={() => handleReopen(h.id)}>Reopen</button>
                       }
+                      <button className="btn btn-ghost" style={{ padding: '3px 8px', fontSize: 10, color: 'var(--red)' }} onClick={() => handleDelete(h.id)}>Delete</button>
                     </div>
                   </td>
                 </tr>

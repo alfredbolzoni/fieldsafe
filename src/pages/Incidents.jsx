@@ -65,6 +65,18 @@ export default function Incidents() {
     fetchAll()
   }
 
+  async function handleReopen(id) {
+    await supabase.from('incidents').update({ status: 'open' }).eq('id', id)
+    fetchAll()
+  }
+
+  async function handleDelete(id) {
+    if (!window.confirm('Delete this incident? This cannot be undone.')) return
+    await supabase.from('corrective_actions').delete().eq('incident_id', id)
+    await supabase.from('incidents').delete().eq('id', id)
+    fetchAll()
+  }
+
   async function handleAddAction() {
     if (!actionForm.description || !actionForm.assigned_to || !actionForm.due_date) { alert('Fill all required fields'); return }
     const { data: { user } } = await supabase.auth.getUser()
@@ -285,16 +297,20 @@ async function handleCloseAction(id) {
                       </td>
                       <td><span className={`pill ${inc.status === 'open' ? 'pill-red' : 'pill-green'}`}>{inc.status === 'open' ? 'Open' : 'Closed'}</span></td>
                       <td>
-                        {inc.status === 'open' && (
-                          <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 11 }} onClick={() => handleClose(inc.id)}>Close</button>
-                        )}
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          {inc.status === 'open'
+                            ? <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 11 }} onClick={() => handleClose(inc.id)}>Close</button>
+                            : <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 11 }} onClick={() => handleReopen(inc.id)}>Reopen</button>
+                          }
+                          <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 11, color: 'var(--red)' }} onClick={() => handleDelete(inc.id)}>Delete</button>
+                        </div>
                       </td>
                     </tr>
 
                     {/* EXPANDED — corrective actions */}
                     {isExpanded && (
                       <tr key={`${inc.id}-expanded`}>
-                        <td colSpan={10} style={{ padding: 0, background: 'var(--surface-2)', borderBottom: '2px solid var(--border)' }}>
+                        <td colSpan={11} style={{ padding: 0, background: 'var(--surface-2)', borderBottom: '2px solid var(--border)' }}>
                           <div style={{ padding: '12px 16px 16px 36px' }}>
                             <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 10 }}>
                               Corrective Actions

@@ -136,22 +136,14 @@ export default function Inspections() {
 
     return (
       <div className="page-wrap">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+        <div className="page-header">
           <div>
-            <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>Active Inspection</h2>
-            <p style={{ color: '#6b7280', fontSize: 13 }}>
-              {activeInspection.date} · {activeInspection.location} · {activeInspection.supervisor}
-            </p>
+            <h1 className="page-title">Active Inspection</h1>
+            <p className="page-sub">{activeInspection.date} · {activeInspection.location} · {activeInspection.supervisor}</p>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => { setView('list'); fetchInspections() }}
-              style={{ padding: '9px 16px', borderRadius: 8, border: '1.5px solid #e5e7eb', background: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', color: '#6b7280' }}>
-              Save & Exit
-            </button>
-            <button onClick={submitInspection}
-              style={{ padding: '9px 16px', borderRadius: 8, border: 'none', background: '#f59e0b', fontSize: 13, fontWeight: 700, cursor: 'pointer', color: '#1a1f2e' }}>
-              Submit Report
-            </button>
+          <div className="page-actions">
+            <button className="btn btn-secondary" onClick={() => { setView('list'); fetchInspections() }}>Save & Exit</button>
+            <button className="btn btn-primary" onClick={submitInspection}>Submit Report</button>
           </div>
         </div>
 
@@ -160,22 +152,22 @@ export default function Inspections() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {items.map(item => (
               <div key={item.id} style={{
-                background: item.result === 'pass' ? '#f0fdf4' : item.result === 'fail' ? '#fef2f2' : '#fff',
-                border: `1px solid ${item.result === 'pass' ? '#bbf7d0' : item.result === 'fail' ? '#fecaca' : '#e5e7eb'}`,
+                background: item.result === 'pass' ? 'var(--green-light)' : item.result === 'fail' ? 'var(--red-light)' : 'var(--surface)',
+                border: `1px solid ${item.result === 'pass' ? 'rgba(52,199,89,0.25)' : item.result === 'fail' ? 'rgba(255,59,48,0.25)' : 'var(--border)'}`,
                 borderRadius: 10, padding: '12px 16px',
                 display: 'flex', alignItems: 'center', gap: 12
               }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>{item.label}</div>
-                  <div style={{ fontSize: 11, color: '#6b7280' }}>{item.sub}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{item.sub}</div>
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                   <button onClick={() => setResult(item.id, item.result === 'pass' ? 'pending' : 'pass')}
-                    style={{ padding: '5px 12px', borderRadius: 6, border: 'none', fontSize: 12, fontWeight: 700, cursor: 'pointer', background: item.result === 'pass' ? '#10b981' : '#f0fdf4', color: item.result === 'pass' ? '#fff' : '#10b981' }}>
+                    style={{ padding: '5px 12px', borderRadius: 6, border: 'none', fontSize: 12, fontWeight: 700, cursor: 'pointer', background: item.result === 'pass' ? 'var(--green)' : 'var(--green-light)', color: item.result === 'pass' ? '#fff' : 'var(--green)' }}>
                     ✓ Pass
                   </button>
                   <button onClick={() => setResult(item.id, item.result === 'fail' ? 'pending' : 'fail')}
-                    style={{ padding: '5px 12px', borderRadius: 6, border: 'none', fontSize: 12, fontWeight: 700, cursor: 'pointer', background: item.result === 'fail' ? '#ef4444' : '#fef2f2', color: item.result === 'fail' ? '#fff' : '#ef4444' }}>
+                    style={{ padding: '5px 12px', borderRadius: 6, border: 'none', fontSize: 12, fontWeight: 700, cursor: 'pointer', background: item.result === 'fail' ? 'var(--red)' : 'var(--red-light)', color: item.result === 'fail' ? '#fff' : 'var(--red)' }}>
                     ✗ Fail
                   </button>
                 </div>
@@ -185,20 +177,20 @@ export default function Inspections() {
 
           {/* SCORE PANEL */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, textAlign: 'center' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 8 }}>Score</div>
+            <div className="card" style={{ textAlign: 'center', padding: 24 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 8 }}>Score</div>
               <div style={{ fontSize: 56, fontWeight: 800, color: scoreColor(score), letterSpacing: '-3px', lineHeight: 1 }}>{score}%</div>
-              <div style={{ height: 8, background: '#f3f4f6', borderRadius: 99, marginTop: 14, overflow: 'hidden' }}>
+              <div style={{ height: 8, background: 'var(--surface-2)', borderRadius: 99, marginTop: 14, overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${score}%`, background: scoreColor(score), borderRadius: 99, transition: 'width 0.4s ease' }} />
               </div>
             </div>
-            <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20 }}>
+            <div className="card" style={{ padding: 20 }}>
               {[
-                { label: '✅ Pass', value: passed, color: '#10b981' },
-                { label: '❌ Fail', value: failed, color: '#ef4444' },
-                { label: '○ Pending', value: pending, color: '#9ca3af' },
+                { label: '✓ Pass', value: passed, color: 'var(--green)' },
+                { label: '✗ Fail', value: failed, color: 'var(--red)' },
+                { label: '○ Pending', value: pending, color: 'var(--text-3)' },
               ].map((s, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: i < 2 ? '1px solid #f3f4f6' : 'none' }}>
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: i < 2 ? '1px solid var(--border)' : 'none' }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: s.color }}>{s.label}</span>
                   <span style={{ fontSize: 18, fontWeight: 800, color: s.color }}>{s.value}</span>
                 </div>
@@ -212,87 +204,78 @@ export default function Inspections() {
 
   // ── LIST VIEW ──
   return (
-    <div style={{ padding: 32, fontFamily: 'system-ui, sans-serif' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+    <div className="page-wrap">
+      <div className="page-header">
         <div>
-          <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>Site Inspections</h2>
-          <p style={{ color: '#6b7280', fontSize: 13 }}>Daily checklists · NS OHS Act compliant · Auto-scored</p>
+          <h1 className="page-title">Site Inspections</h1>
+          <p className="page-sub">Daily checklists · NS OHS Act compliant · Auto-scored</p>
         </div>
-        <button onClick={() => setView('new')}
-          style={{ background: '#f59e0b', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer', color: '#1a1f2e' }}>
-          + Start Inspection
-        </button>
+        <button className="btn btn-primary" onClick={() => setView('new')}>+ Start Inspection</button>
       </div>
 
       {/* NEW INSPECTION FORM */}
       {view === 'new' && (
-        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 20 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>New Inspection</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 16 }}>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 4 }}>Date</label>
-              <input type='date' value={form.date} onChange={e => setForm({ ...form, date: e.target.value })}
-                style={{ width: '100%', border: '1.5px solid #e5e7eb', borderRadius: 8, padding: '9px 12px', fontSize: 13, boxSizing: 'border-box' }} />
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setView('list')}>
+          <div className="modal">
+            <div className="modal-title">New Inspection</div>
+            <div className="modal-sub">Start a NS OHS compliant daily site checklist</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+              <div className="form-group">
+                <label className="form-label">Date</label>
+                <input type="date" className="form-input" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Supervisor</label>
+                <input className="form-input" value={form.supervisor} onChange={e => setForm({ ...form, supervisor: e.target.value })} placeholder="Full name" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Location</label>
+                <input className="form-input" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="e.g. Building A, North face" />
+              </div>
             </div>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 4 }}>Supervisor</label>
-              <input value={form.supervisor} onChange={e => setForm({ ...form, supervisor: e.target.value })}
-                placeholder='Full name'
-                style={{ width: '100%', border: '1.5px solid #e5e7eb', borderRadius: 8, padding: '9px 12px', fontSize: 13, boxSizing: 'border-box' }} />
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setView('list')}>Cancel</button>
+              <button className="btn btn-primary" onClick={startInspection} disabled={saving}>
+                {saving ? 'Starting...' : 'Start Inspection →'}
+              </button>
             </div>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 4 }}>Location</label>
-              <input value={form.location} onChange={e => setForm({ ...form, location: e.target.value })}
-                placeholder='e.g. Building A, North face'
-                style={{ width: '100%', border: '1.5px solid #e5e7eb', borderRadius: 8, padding: '9px 12px', fontSize: 13, boxSizing: 'border-box' }} />
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => setView('list')}
-              style={{ padding: '9px 16px', borderRadius: 8, border: '1.5px solid #e5e7eb', background: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', color: '#6b7280' }}>
-              Cancel
-            </button>
-            <button onClick={startInspection} disabled={saving}
-              style={{ padding: '9px 16px', borderRadius: 8, border: 'none', background: '#f59e0b', fontSize: 13, fontWeight: 700, cursor: 'pointer', color: '#1a1f2e' }}>
-              {saving ? 'Starting...' : 'Start Inspection →'}
-            </button>
           </div>
         </div>
       )}
 
       {/* INSPECTIONS TABLE */}
-      <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+      <div className="table-wrap">
         {inspections.length === 0 ? (
-          <div style={{ padding: 60, textAlign: 'center' }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
-            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>No inspections yet</div>
-            <div style={{ fontSize: 13, color: '#6b7280' }}>Click "+ Start Inspection" to begin your first daily checklist</div>
+          <div className="empty-state">
+            <div className="empty-icon">✓</div>
+            <div className="empty-title">No inspections yet</div>
+            <div className="empty-sub">Click "+ Start Inspection" to begin your first daily checklist</div>
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="fs-table">
             <thead>
-              <tr style={{ background: '#f9fafb' }}>
-                {['Date', 'Location', 'Supervisor', 'Score', 'Pass', 'Fail', 'Status'].map(h => (
-                  <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', borderBottom: '1px solid #e5e7eb' }}>{h}</th>
-                ))}
+              <tr>
+                <th>Date</th>
+                <th>Location</th>
+                <th>Supervisor</th>
+                <th>Score</th>
+                <th>Pass</th>
+                <th>Fail</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
               {inspections.map(ins => (
-                <tr key={ins.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                  <td style={{ padding: '12px 14px', fontSize: 12, fontFamily: 'monospace' }}>{ins.date}</td>
-                  <td style={{ padding: '12px 14px', fontSize: 13 }}>{ins.location}</td>
-                  <td style={{ padding: '12px 14px', fontSize: 13 }}>{ins.supervisor}</td>
-                  <td style={{ padding: '12px 14px' }}>
+                <tr key={ins.id}>
+                  <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>{ins.date}</td>
+                  <td>{ins.location}</td>
+                  <td>{ins.supervisor}</td>
+                  <td>
                     <span style={{ fontSize: 14, fontWeight: 800, color: scoreColor(ins.score || 0) }}>{ins.score || 0}%</span>
                   </td>
-                  <td style={{ padding: '12px 14px' }}>
-                    <span style={{ color: '#10b981', fontWeight: 700, fontSize: 13 }}>✓ {ins.passed || 0}</span>
-                  </td>
-                  <td style={{ padding: '12px 14px' }}>
-                    <span style={{ color: '#ef4444', fontWeight: 700, fontSize: 13 }}>✗ {ins.failed || 0}</span>
-                  </td>
-                  <td style={{ padding: '12px 14px' }}>{statusPill(ins.status)}</td>
+                  <td><span style={{ color: 'var(--green)', fontWeight: 700, fontSize: 13 }}>✓ {ins.passed || 0}</span></td>
+                  <td><span style={{ color: 'var(--red)', fontWeight: 700, fontSize: 13 }}>✗ {ins.failed || 0}</span></td>
+                  <td>{statusPill(ins.status)}</td>
                 </tr>
               ))}
             </tbody>

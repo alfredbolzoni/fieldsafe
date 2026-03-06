@@ -1,131 +1,318 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
+const PRIORITIES = ['Low', 'Medium', 'High', 'Critical']
+
 export default function Incidents() {
   const [incidents, setIncidents] = useState([])
+  const [actions, setActions] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [showActionForm, setShowActionForm] = useState(false)
+  const [selectedIncident, setSelectedIncident] = useState(null)
+  const [expandedIncident, setExpandedIncident] = useState(null)
+  const [tab, setTab] = useState('open')
   const [submitting, setSubmitting] = useState(false)
+
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
-    type: 'Near-Miss',
-    description: '',
-    location: '',
-    reported_by: '',
-    severity: 'Low'
+    type: 'Near-Miss', description: '', location: '',
+    reported_by: '', severity: 'Low'
   })
 
-  useEffect(() => { fetchIncidents() }, [])
+  const [actionForm, setActionForm] = useState({
+    description: '', assigned_to: '', due_date: '', priority: 'Medium', notes: ''
+  })
 
-  async function fetchIncidents() {
+  useEffect(() => { fetchAll() }, [])
+
+  async function fetchAll() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
-    const { data } = await supabase
-      .from('incidents').select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-    setIncidents(data || [])
+    const [{ data: inc }, { data: act }] = await Promise.all([
+      supabase.from('incidents').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('corrective_actions').select('*').eq('user_id', user.id).order('due_date')
+    ])
+    setIncidents(inc || [])
+    setActions(act || [])
     setLoading(false)
   }
 
   async function handleSubmit() {
-    if (!form.description || !form.location || !form.reported_by) {
-      alert('Please fill all fields'); return
-    }
+    if (!form.description || !form.location || !form.reported_by) { alert('Please fill all fields'); return }
     setSubmitting(true)
     const { data: { user } } = await supabase.auth.getUser()
     await supabase.from('incidents').insert([{ ...form, user_id: user.id }])
     setForm({ date: new Date().toISOString().split('T')[0], type: 'Near-Miss', description: '', location: '', reported_by: '', severity: 'Low' })
     setShowForm(false)
     setSubmitting(false)
-    fetchIncidents()
+    fetchAll()
   }
 
   async function handleClose(id) {
     await supabase.from('incidents').update({ status: 'closed' }).eq('id', id)
-    fetchIncidents()
+    fetchAll()
   }
 
-  const sevColor = { Low: 'pill-green', Medium: 'pill-amber', High: 'pill-red' }
+  async function handleAddAction() {
+    if (!actionForm.description || !actionForm.assigned_to || !actionForm.due_date) { alert('Fill all required fields'); return }
+    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.from('corrective_actions').insert([{
+      ...actionForm, incident_id: selectedIncident, user_id: user.id
+    }])
+    setActionForm({ description: '', assigned_to: '', due_date: '', priority: 'Medium', notes: '' })
+    setShowActionForm(false)
+    setSelectedIncident(null)
+    fetchAll()
+  }
+
+  async function handleCloseAction(id) {
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: userData } = await supabase.auth.getUser()
+    await supabase.from('corrective_actions').update({
+      status: 'closed',
+      closed_at: new Date().toISOString().split('T')[0],
+      closed_by: userData.user.email
+    }).eq('id', id)
+    fetchAll()
+  }
+
+  async function handleUpdateActionStatus(id, status) {
+    await supabase.from('corrective_actions').update({ status }).eq('id', id)
+    fetchAll()
+  }
+
+  function getActionsForIncident(incidentId) {
+    return actions.filter(a => a.incident_id === incidentId)
+  }
+
+  function isOverdue(dueDate) {
+    return new Date(dueDate) < new Date() 
+  }
+
+  function daysUntil(dueDate) {
+    const days = Math.floor((new Date(dueDate) - new Date()) / 86400000)
+    if (days < 0) return `${Math.abs(days)}d overdue`
+    if (days === 0) return 'Due today'
+    return `${days}d remaining`
+  }
+
+  const sevPill = { Low: 'pill-green', Medium: 'pill-amber', High: 'pill-orange', Critical: 'pill-red' }
+  const priorityPill = { Low: 'pill-green', Medium: 'pill-amber', High: 'pill-orange', Critical: 'pill-red' }
+
+  const filteredIncidents = tab === 'open'
+    ? incidents.filter(i => i.status === 'open')
+    : tab === 'closed'
+    ? incidents.filter(i => i.status === 'closed')
+    : incidents
+
+  const overdueActions = actions.filter(a => a.status !== 'closed' && isOverdue(a.due_date))
+  const openActions = actions.filter(a => a.status !== 'closed')
+
+  if (loading) return <div className="page-wrap"><div className="empty-state"><div className="empty-sub">Loading...</div></div></div>
 
   return (
     <div className="page-wrap">
+
+      {/* HEADER */}
       <div className="page-header">
         <div>
-          <h1 className="page-title">Incident Reports</h1>
-          <p className="page-sub">Log and track all incidents, near-misses and hazards</p>
+          <h1 className="page-title">Incident Management</h1>
+          <p className="page-sub">Log incidents · Assign corrective actions · Track closure</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowForm(true)}>+ Log Incident</button>
+        <div className="page-actions">
+          <button className="btn btn-secondary" onClick={() => { setShowActionForm(true) }}>+ Corrective Action</button>
+          <button className="btn btn-primary" onClick={() => setShowForm(true)}>+ Log Incident</button>
+        </div>
       </div>
 
-      {/* STATS */}
-      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 24 }}>
+      {/* ALERT — overdue actions */}
+      {overdueActions.length > 0 && (
+        <div className="alert alert-warn" style={{ marginBottom: 16 }}>
+          <div>
+            <div className="alert-title">⚠ {overdueActions.length} Overdue Corrective Action{overdueActions.length > 1 ? 's' : ''}</div>
+            <div className="alert-body">
+              {overdueActions.slice(0,2).map(a => `"${a.description}" assigned to ${a.assigned_to} — ${daysUntil(a.due_date)}`).join(' · ')}
+              {overdueActions.length > 2 && ` · +${overdueActions.length - 2} more`}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* KPI ROW */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
         {[
-          { icon: '🔴', label: 'Open', value: incidents.filter(i => i.status === 'open').length, color: 'var(--red)' },
-          { icon: '✅', label: 'Closed', value: incidents.filter(i => i.status === 'closed').length, color: 'var(--green)' },
-          { icon: '⚠️', label: 'High Severity', value: incidents.filter(i => i.severity === 'High').length, color: 'var(--orange)' },
+          { label: 'Open Incidents', value: incidents.filter(i => i.status === 'open').length, color: incidents.filter(i => i.status === 'open').length > 0 ? 'var(--red)' : 'var(--green)', delta: `${incidents.filter(i => i.status === 'closed').length} closed` },
+          { label: 'Open Actions', value: openActions.length, color: openActions.length > 0 ? 'var(--amber)' : 'var(--green)', delta: `${actions.filter(a => a.status === 'closed').length} completed` },
+          { label: 'Overdue Actions', value: overdueActions.length, color: overdueActions.length > 0 ? 'var(--red)' : 'var(--green)', delta: overdueActions.length > 0 ? 'Immediate attention' : 'All on track' },
+          { label: 'High Severity', value: incidents.filter(i => i.severity === 'High' || i.severity === 'Critical').length, color: 'var(--orange)', delta: 'High + Critical' },
         ].map((k, i) => (
-          <div key={i} className="kpi-card">
-            <div className="kpi-icon">{k.icon}</div>
+          <div key={i} className="kpi-card" style={{ borderLeft: `3px solid ${k.color}` }}>
             <div className="kpi-label">{k.label}</div>
-            <div className="kpi-value" style={{ color: k.color }}>{k.value}</div>
+            <div className="kpi-value" style={{ color: k.color, fontSize: 28 }}>{k.value}</div>
+            <div className="kpi-delta">{k.delta}</div>
           </div>
         ))}
       </div>
 
-      {/* TABLE */}
-      <div className="table-wrap">
-        {loading ? (
-          <div className="empty-state"><div className="empty-sub">Loading...</div></div>
-        ) : incidents.length === 0 ? (
+      {/* TABS */}
+      <div className="tabs">
+        {[
+          { id: 'open', label: `Open (${incidents.filter(i=>i.status==='open').length})` },
+          { id: 'closed', label: `Closed (${incidents.filter(i=>i.status==='closed').length})` },
+          { id: 'all', label: `All (${incidents.length})` },
+        ].map(t => (
+          <button key={t.id} className={`tab-btn ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>
+        ))}
+      </div>
+
+      {/* INCIDENTS TABLE */}
+      <div className="table-wrap" style={{ marginBottom: 0 }}>
+        {filteredIncidents.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">🎉</div>
-            <div className="empty-title">No incidents logged</div>
-            <div className="empty-sub">Click "+ Log Incident" to record your first entry</div>
+            <div className="empty-icon">✓</div>
+            <div className="empty-title">No {tab === 'open' ? 'open ' : ''}incidents</div>
+            <div className="empty-sub">{tab === 'open' ? 'All incidents are closed or none logged yet' : 'No incidents logged yet'}</div>
           </div>
         ) : (
           <table className="fs-table">
             <thead>
               <tr>
-                {['Date', 'Type', 'Description', 'Location', 'Reported By', 'Severity', 'Status', ''].map(h => (
-                  <th key={h}>{h}</th>
-                ))}
+                <th style={{ width: 20 }}></th>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Description</th>
+                <th>Location</th>
+                <th>Reported By</th>
+                <th>Severity</th>
+                <th>Actions</th>
+                <th>Status</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
-              {incidents.map(inc => (
-                <tr key={inc.id}>
-                  <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 12 }}>{inc.date}</td>
-                  <td><span className="pill pill-blue">{inc.type}</span></td>
-                  <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inc.description}</td>
-                  <td>{inc.location}</td>
-                  <td>{inc.reported_by}</td>
-                  <td><span className={`pill ${sevColor[inc.severity]}`}>{inc.severity}</span></td>
-                  <td>
-                    <span className={`pill ${inc.status === 'open' ? 'pill-red' : 'pill-green'}`}>
-                      {inc.status === 'open' ? 'Open' : 'Closed'}
-                    </span>
-                  </td>
-                  <td>
-                    {inc.status === 'open' && (
-                      <button className="btn btn-ghost" style={{ padding: '5px 12px', fontSize: 11 }} onClick={() => handleClose(inc.id)}>
-                        Close
-                      </button>
+              {filteredIncidents.map(inc => {
+                const incActions = getActionsForIncident(inc.id)
+                const openAct = incActions.filter(a => a.status !== 'closed')
+                const overdueAct = incActions.filter(a => a.status !== 'closed' && isOverdue(a.due_date))
+                const isExpanded = expandedIncident === inc.id
+
+                return (
+                  <>
+                    <tr key={inc.id} style={{ background: isExpanded ? 'var(--surface-2)' : undefined }}>
+                      <td>
+                        <button
+                          onClick={() => setExpandedIncident(isExpanded ? null : inc.id)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', fontSize: 10, padding: '2px 4px', borderRadius: 3, fontFamily: 'Inter' }}
+                        >
+                          {isExpanded ? '▼' : '▶'}
+                        </button>
+                      </td>
+                      <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>{inc.date}</td>
+                      <td><span className="pill pill-blue">{inc.type}</span></td>
+                      <td style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inc.description}</td>
+                      <td>{inc.location}</td>
+                      <td>{inc.reported_by}</td>
+                      <td><span className={`pill ${sevPill[inc.severity] || 'pill-gray'}`}>{inc.severity}</span></td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 12, color: overdueAct.length > 0 ? 'var(--red)' : openAct.length > 0 ? 'var(--amber)' : 'var(--text-3)' }}>
+                            {incActions.length === 0 ? '—' : `${openAct.length} open`}
+                          </span>
+                          {overdueAct.length > 0 && <span className="pill pill-red" style={{ fontSize: 9 }}>OVERDUE</span>}
+                          <button
+                            className="btn btn-ghost"
+                            style={{ padding: '3px 8px', fontSize: 10 }}
+                            onClick={() => { setSelectedIncident(inc.id); setShowActionForm(true) }}
+                          >+ Add</button>
+                        </div>
+                      </td>
+                      <td><span className={`pill ${inc.status === 'open' ? 'pill-red' : 'pill-green'}`}>{inc.status === 'open' ? 'Open' : 'Closed'}</span></td>
+                      <td>
+                        {inc.status === 'open' && (
+                          <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 11 }} onClick={() => handleClose(inc.id)}>Close</button>
+                        )}
+                      </td>
+                    </tr>
+
+                    {/* EXPANDED — corrective actions */}
+                    {isExpanded && (
+                      <tr key={`${inc.id}-expanded`}>
+                        <td colSpan={10} style={{ padding: 0, background: 'var(--surface-2)', borderBottom: '2px solid var(--border)' }}>
+                          <div style={{ padding: '12px 16px 16px 36px' }}>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 10 }}>
+                              Corrective Actions
+                            </div>
+
+                            {incActions.length === 0 ? (
+                              <div style={{ fontSize: 12, color: 'var(--text-3)', fontStyle: 'italic', padding: '8px 0' }}>
+                                No corrective actions assigned — <button
+                                  onClick={() => { setSelectedIncident(inc.id); setShowActionForm(true) }}
+                                  style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: 0 }}>
+                                  Add one now
+                                </button>
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                {incActions.map(action => (
+                                  <div key={action.id} style={{
+                                    background: 'var(--surface)', border: '1px solid var(--border)',
+                                    borderLeft: `3px solid ${action.status === 'closed' ? 'var(--green)' : isOverdue(action.due_date) ? 'var(--red)' : 'var(--amber)'}`,
+                                    borderRadius: 6, padding: '10px 14px',
+                                    display: 'flex', alignItems: 'center', gap: 14
+                                  }}>
+                                    <div style={{ flex: 1 }}>
+                                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 3 }}>{action.description}</div>
+                                      <div style={{ fontSize: 11, color: 'var(--text-2)' }}>
+                                        Assigned to <b>{action.assigned_to}</b> · Due {action.due_date} ·{' '}
+                                        <span style={{ color: action.status === 'closed' ? 'var(--green)' : isOverdue(action.due_date) ? 'var(--red)' : 'var(--amber)', fontWeight: 600 }}>
+                                          {action.status === 'closed' ? 'Completed' : daysUntil(action.due_date)}
+                                        </span>
+                                      </div>
+                                      {action.notes && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 3 }}>{action.notes}</div>}
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+                                      <span className={`pill ${priorityPill[action.priority] || 'pill-gray'}`}>{action.priority}</span>
+                                      {action.status !== 'closed' && (
+                                        <>
+                                          {action.status === 'open' && (
+                                            <button className="btn btn-ghost" style={{ padding: '3px 9px', fontSize: 10 }}
+                                              onClick={() => handleUpdateActionStatus(action.id, 'in-progress')}>
+                                              Start
+                                            </button>
+                                          )}
+                                          <button className="btn btn-secondary" style={{ padding: '3px 9px', fontSize: 10 }}
+                                            onClick={() => handleCloseAction(action.id)}>
+                                            ✓ Done
+                                          </button>
+                                        </>
+                                      )}
+                                      {action.status === 'closed' && (
+                                        <span className="pill pill-green">Closed</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
                     )}
-                  </td>
-                </tr>
-              ))}
+                  </>
+                )
+              })}
             </tbody>
           </table>
         )}
       </div>
 
-      {/* MODAL */}
+      {/* LOG INCIDENT MODAL */}
       {showForm && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowForm(false)}>
           <div className="modal">
             <div className="modal-title">Log Incident</div>
-            <div className="modal-sub">All fields required — saved to your database</div>
+            <div className="modal-sub">Record incident details — corrective actions can be added after</div>
 
             <div className="grid-2" style={{ marginBottom: 0 }}>
               <div className="form-group">
@@ -146,13 +333,13 @@ export default function Incidents() {
 
             <div className="form-group">
               <label className="form-label">Description</label>
-              <textarea className="form-input" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="What happened? Be specific..." />
+              <textarea className="form-input" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="What happened? Be specific about sequence of events..." />
             </div>
 
             <div className="grid-2" style={{ marginBottom: 0 }}>
               <div className="form-group">
                 <label className="form-label">Location</label>
-                <input className="form-input" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="e.g. Scaffold Level 2" />
+                <input className="form-input" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="e.g. Scaffold Level 2, North face" />
               </div>
               <div className="form-group">
                 <label className="form-label">Reported By</label>
@@ -162,20 +349,13 @@ export default function Incidents() {
 
             <div className="form-group">
               <label className="form-label">Severity</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {['Low', 'Medium', 'High'].map(s => {
-                  const colors = { Low: 'var(--green)', Medium: 'var(--orange)', High: 'var(--red)' }
+              <div style={{ display: 'flex', gap: 6 }}>
+                {['Low', 'Medium', 'High', 'Critical'].map(s => {
+                  const colors = { Low: 'var(--green)', Medium: 'var(--amber)', High: 'var(--orange)', Critical: 'var(--red)' }
                   const active = form.severity === s
                   return (
                     <button key={s} onClick={() => setForm({ ...form, severity: s })}
-                      style={{
-                        padding: '8px 22px', borderRadius: 8, fontSize: 13, fontWeight: 600,
-                        cursor: 'pointer', border: '2px solid',
-                        borderColor: active ? colors[s] : 'var(--border-strong)',
-                        background: active ? colors[s] : 'transparent',
-                        color: active ? '#fff' : 'var(--text-2)',
-                        transition: 'all 0.15s'
-                      }}>
+                      style={{ padding: '6px 16px', borderRadius: 4, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1.5px solid ${active ? colors[s] : 'var(--border-strong)'}`, background: active ? colors[s] : 'transparent', color: active ? '#fff' : 'var(--text-2)', transition: 'all 0.12s' }}>
                       {s}
                     </button>
                   )
@@ -183,11 +363,88 @@ export default function Incidents() {
               </div>
             </div>
 
+            {form.type === 'Time-Loss Injury' && (
+              <div className="alert alert-warn" style={{ marginTop: 4 }}>
+                <div>
+                  <div className="alert-title">⚠ NS OHS Notification Required</div>
+                  <div className="alert-body">Time-Loss Injuries must be reported to NS Department of Labour & Advanced Education within 24 hours under the Occupational Health and Safety Act.</div>
+                </div>
+              </div>
+            )}
+
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
               <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting}>
                 {submitting ? 'Saving...' : 'Submit Report'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ADD CORRECTIVE ACTION MODAL */}
+      {showActionForm && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowActionForm(false)}>
+          <div className="modal">
+            <div className="modal-title">Add Corrective Action</div>
+            <div className="modal-sub">
+              {selectedIncident
+                ? `Linked to: ${incidents.find(i => i.id === selectedIncident)?.description?.slice(0,50) || 'incident'}...`
+                : 'Select the incident this action belongs to'}
+            </div>
+
+            {!selectedIncident && (
+              <div className="form-group">
+                <label className="form-label">Linked Incident</label>
+                <select className="form-input" value={selectedIncident || ''} onChange={e => setSelectedIncident(e.target.value)}>
+                  <option value=''>Select incident...</option>
+                  {incidents.filter(i => i.status === 'open').map(i => (
+                    <option key={i.id} value={i.id}>{i.date} — {i.description.slice(0,50)}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="form-group">
+              <label className="form-label">Action Description *</label>
+              <textarea className="form-input" value={actionForm.description} onChange={e => setActionForm({ ...actionForm, description: e.target.value })} placeholder="What corrective action must be taken?" style={{ minHeight: 70 }} />
+            </div>
+
+            <div className="grid-2" style={{ marginBottom: 0 }}>
+              <div className="form-group">
+                <label className="form-label">Assigned To *</label>
+                <input className="form-input" value={actionForm.assigned_to} onChange={e => setActionForm({ ...actionForm, assigned_to: e.target.value })} placeholder="Responsible person" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Due Date *</label>
+                <input type="date" className="form-input" value={actionForm.due_date} onChange={e => setActionForm({ ...actionForm, due_date: e.target.value })} />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Priority</label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {PRIORITIES.map(p => {
+                  const colors = { Low: 'var(--green)', Medium: 'var(--amber)', High: 'var(--orange)', Critical: 'var(--red)' }
+                  const active = actionForm.priority === p
+                  return (
+                    <button key={p} onClick={() => setActionForm({ ...actionForm, priority: p })}
+                      style={{ padding: '5px 14px', borderRadius: 4, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1.5px solid ${active ? colors[p] : 'var(--border-strong)'}`, background: active ? colors[p] : 'transparent', color: active ? '#fff' : 'var(--text-2)', transition: 'all 0.12s' }}>
+                      {p}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Notes</label>
+              <input className="form-input" value={actionForm.notes} onChange={e => setActionForm({ ...actionForm, notes: e.target.value })} placeholder="Additional context or instructions..." />
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => { setShowActionForm(false); setSelectedIncident(null) }}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleAddAction}>Save Action</button>
             </div>
           </div>
         </div>

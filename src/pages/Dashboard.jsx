@@ -19,14 +19,15 @@ export default function Dashboard() {
       <aside className="sidebar">
         <div className="sidebar-logo">
           <div className="logo-mark">
-            <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M8 1L14 4V8C14 11.3 11.3 14.2 8 15C4.7 14.2 2 11.3 2 8V4L8 1Z" fill="#1a1200" fillOpacity="0.8"/>
+            <svg viewBox="0 0 16 16" fill="none">
+              <path d="M8 1L14 4V8C14 11.3 11.3 14.2 8 15C4.7 14.2 2 11.3 2 8V4L8 1Z" fill="#1a1200" fillOpacity="0.9"/>
               <path d="M6 8L7.5 9.5L10.5 6.5" stroke="#1a1200" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            <b>FieldSafe</b>
           </div>
-          <div className="sidebar-company">HSE Platform</div>
-          <div className="sidebar-sub">Nova Scotia · Active</div>
+          <div className="logo-text">
+            <b>FieldSafe</b>
+            <span>Nova Scotia · HSE</span>
+          </div>
         </div>
 
         <nav style={{ flex: 1, overflowY: 'auto' }}>
@@ -70,6 +71,18 @@ export default function Dashboard() {
 
       {/* MAIN */}
       <main className="main-content">
+        <div className="topbar">
+          <div className="breadcrumb">
+            <span className="breadcrumb-root">FieldSafe</span>
+            <span className="breadcrumb-sep">/</span>
+            <span className="breadcrumb-current">{page.charAt(0).toUpperCase() + page.slice(1)}</span>
+          </div>
+          <div className="topbar-right">
+            <span className="topbar-date">{new Date().toLocaleDateString('en-CA', { weekday:'short', month:'short', day:'numeric', year:'numeric' })}</span>
+            <button className="btn btn-primary" onClick={() => setPage('incidents')}>+ Log Incident</button>
+          </div>
+        </div>
+
         {page === 'dashboard' && <DashboardHome setPage={setPage} />}
         {page === 'incidents' && <Incidents />}
         {page === 'inspections' && <Inspections />}

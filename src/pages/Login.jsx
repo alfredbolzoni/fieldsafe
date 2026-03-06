@@ -51,7 +51,7 @@ export default function Login() {
             background: '#f5a623', borderRadius: 10, padding: '7px 13px',
             marginBottom: 20
           }}>
-            <span style={{ fontSize: 16 }}>🦺</span>
+            <span style={{ fontSize: 16 }}></span>
             <b style={{ fontSize: 14, fontWeight: 700, color: '#1d1d1f' }}>FieldSafe</b>
           </div>
           <h1 style={{ fontSize: 24, fontWeight: 700, color: '#fff', letterSpacing: '-0.5px', marginBottom: 6 }}>

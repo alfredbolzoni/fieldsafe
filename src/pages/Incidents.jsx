@@ -228,8 +228,6 @@ async function handleCloseAction(id) {
                 <th>Date</th>
                 <th>Type</th>
                 <th>Description</th>
-                <th>Location</th>
-                <th>Reported By</th>
                 <th>Severity</th>
                 <th>Actions</th>
                 <th>NS OHS Class</th>
@@ -257,9 +255,10 @@ async function handleCloseAction(id) {
                       </td>
                       <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>{inc.date}</td>
                       <td><span className="pill pill-blue">{inc.type}</span></td>
-                      <td style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inc.description}</td>
-                      <td>{inc.location}</td>
-                      <td>{inc.reported_by}</td>
+                      <td style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inc.description}</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>{inc.location} · {inc.reported_by}</div>
+                      </td>
                       <td><span className={`pill ${sevPill[inc.severity] || 'pill-gray'}`}>{inc.severity}</span></td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -310,7 +309,7 @@ async function handleCloseAction(id) {
                     {/* EXPANDED — corrective actions */}
                     {isExpanded && (
                       <tr key={`${inc.id}-expanded`}>
-                        <td colSpan={11} style={{ padding: 0, background: 'var(--surface-2)', borderBottom: '2px solid var(--border)' }}>
+                        <td colSpan={9} style={{ padding: 0, background: 'var(--surface-2)', borderBottom: '2px solid var(--border)' }}>
                           <div style={{ padding: '12px 16px 16px 36px' }}>
                             <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 10 }}>
                               Corrective Actions

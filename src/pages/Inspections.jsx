@@ -79,6 +79,12 @@ export default function Inspections() {
     setItems(data || [])
   }
 
+  async function resumeInspection(ins) {
+    setActiveInspection(ins)
+    await fetchInspection(ins.id)
+    setView('active')
+  }
+
   async function setResult(itemId, result) {
     await supabase.from('inspection_items').update({ result }).eq('id', itemId)
     const updated = items.map(i => i.id === itemId ? { ...i, result } : i)
@@ -105,9 +111,9 @@ export default function Inspections() {
   }
 
   function scoreColor(score) {
-    if (score >= 80) return '#10b981'
-    if (score >= 60) return '#f59e0b'
-    return '#ef4444'
+    if (score >= 80) return 'var(--green)'
+    if (score >= 60) return 'var(--amber)'
+    return 'var(--red)'
   }
 
   function statusPill(status) {
@@ -262,6 +268,7 @@ export default function Inspections() {
                 <th>Pass</th>
                 <th>Fail</th>
                 <th>Status</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -276,6 +283,11 @@ export default function Inspections() {
                   <td><span style={{ color: 'var(--green)', fontWeight: 700, fontSize: 13 }}>✓ {ins.passed || 0}</span></td>
                   <td><span style={{ color: 'var(--red)', fontWeight: 700, fontSize: 13 }}>✗ {ins.failed || 0}</span></td>
                   <td>{statusPill(ins.status)}</td>
+                  <td>
+                    {ins.status === 'in-progress' && (
+                      <button className="btn btn-ghost" style={{ padding: '3px 10px', fontSize: 11 }} onClick={() => resumeInspection(ins)}>Resume →</button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

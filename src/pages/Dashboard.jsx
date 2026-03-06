@@ -8,6 +8,11 @@ import Hazards from './Hazards'
 
 export default function Dashboard() {
   const [page, setPage] = useState('dashboard')
+  const [user, setUser] = useState(null)
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => setUser(user))
+  }, [])
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -60,10 +65,12 @@ export default function Dashboard() {
 
         <div className="sidebar-footer">
           <div className="user-row">
-            <div className="avatar">HS</div>
+            <div className="avatar">
+              {user?.email ? user.email.slice(0, 2).toUpperCase() : 'HS'}
+            </div>
             <div>
-              <div className="user-name">HSE Manager</div>
-              <div className="user-role">FieldSafe Pro</div>
+              <div className="user-name">{user?.email?.split('@')[0] || 'HSE Manager'}</div>
+              <div className="user-role">{user?.email || 'FieldSafe Pro'}</div>
             </div>
             <div className="online-dot" />
           </div>
@@ -342,37 +349,6 @@ const modules = [
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: mod.statColor }}>{mod.stat}</div>
               <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 3 }}>Open →</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* COMING SOON */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '1px', whiteSpace: 'nowrap' }}>Coming Soon</div>
-        <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 14 }}>
-        {[
-          { icon: '🤖', title: 'AI Near-Miss Analyser', desc: 'Root cause analysis powered by Claude AI' },
-          { icon: '🆕', title: 'Worker Onboarding', desc: 'Digital onboarding forms for new hires' },
-        ].map((mod, i) => (
-          <div key={i} style={{
-            background: 'var(--surface-2)',
-            border: '1px dashed var(--border-strong)',
-            borderRadius: 16, padding: '20px 24px',
-            display: 'flex', alignItems: 'center', gap: 18, opacity: 0.6
-          }}>
-            <div style={{ width: 52, height: 52, background: 'var(--bg)', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>
-              {mod.icon}
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{mod.title}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-2)' }}>{mod.desc}</div>
-            </div>
-            <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 99, padding: '4px 12px', fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Soon
             </div>
           </div>
         ))}

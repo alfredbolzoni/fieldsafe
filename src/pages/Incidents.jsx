@@ -68,7 +68,7 @@ export default function Incidents() {
 
   async function handleCloseAction(id) {
     const { data: { user } } = await supabase.auth.getUser()
-    const { data: userData } = await supabase.auth.getUser()
+    await supabase.auth.getUser()
     await supabase.from('corrective_actions').update({
       status: 'closed',
       closed_at: new Date().toISOString().split('T')[0],

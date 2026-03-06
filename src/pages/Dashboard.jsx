@@ -97,7 +97,7 @@ export default function Dashboard() {
 }
 
 function DashboardHome({ setPage }) {
-  const [stats, setStats] = useState({ incidents: 0, openIncidents: 0, inspections: 0, avgScore: 0, workers: 0, expiring: 0, daysLTI: '0' })
+  const [stats, setStats] = useState({ incidents: 0, openIncidents: 0, inspections: 0, avgScore: 0, workers: 0, expiring: 0, expired: 0, daysLTI: 'None', overdueActions: 0, criticalHazards: 0, overdueHazardReview: 0, timeLossIncidents: 0, activeHazards: 0, openActions: 0 })
 const [, setLoading] = useState(true)
   const now = new Date()
   const timeStr = now.toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' })
@@ -106,32 +106,38 @@ const [, setLoading] = useState(true)
   useEffect(() => { fetchStats() }, [])
 
   async function fetchStats() {
-    const { data: { user } } = await supabase.auth.getUser()
-    const [{ data: inc }, { data: ins }, { data: wrk }, { data: cer }] = await Promise.all([
-      supabase.from('incidents').select('*').eq('user_id', user.id),
-      supabase.from('inspections').select('*').eq('user_id', user.id),
-      supabase.from('workers').select('*').eq('user_id', user.id),
-      supabase.from('certifications').select('*').eq('user_id', user.id),
-    ])
-    const incidents = inc || []
-    const inspections = ins || []
-    const workers = wrk || []
-    const certs = cer || []
+  const { data: { user } } = await supabase.auth.getUser()
+  const [{ data: inc }, { data: ins }, { data: wrk }, { data: cer }, { data: haz }, { data: act }] = await Promise.all([
+    supabase.from('incidents').select('*').eq('user_id', user.id),
+    supabase.from('inspections').select('*').eq('user_id', user.id),
+    supabase.from('workers').select('*').eq('user_id', user.id),
+    supabase.from('certifications').select('*').eq('user_id', user.id),
+    supabase.from('hazards').select('*').eq('user_id', user.id),
+    supabase.from('corrective_actions').select('*').eq('user_id', user.id),
+  ])
+  const incidents = inc || [], inspections = ins || [], workers = wrk || [], certs = cer || [], hazards = haz || [], actions = act || []
+  const today = new Date()
 
-    const openIncidents = incidents.filter(i => i.status === 'open').length
-    const avgScore = inspections.length > 0 ? Math.round(inspections.reduce((s, i) => s + (i.score || 0), 0) / inspections.length) : 0
-    const today = new Date()
-    const expiring = certs.filter(c => {
-      if (!c.expiry_date) return false
-      const days = Math.floor((new Date(c.expiry_date) - today) / (1000 * 60 * 60 * 24))
-      return days >= 0 && days <= 30
-    }).length
-    const lastLTI = incidents.filter(i => i.type === 'Time-Loss Injury').sort((a, b) => new Date(b.date) - new Date(a.date))[0]
-    const daysLTI = lastLTI ? Math.floor((today - new Date(lastLTI.date)) / (1000 * 60 * 60 * 24)) : incidents.length > 0 ? '✓' : '—'
+  const openIncidents = incidents.filter(i => i.status === 'open').length
+  const avgScore = inspections.length > 0 ? Math.round(inspections.reduce((s, i) => s + (i.score || 0), 0) / inspections.length) : 0
+  const expiring = certs.filter(c => { if (!c.expiry_date) return false; const d = Math.floor((new Date(c.expiry_date) - today) / 86400000); return d >= 0 && d <= 30 }).length
+  const expired = certs.filter(c => c.expiry_date && new Date(c.expiry_date) < today).length
+  const lastLTI = incidents.filter(i => i.type === 'Time-Loss Injury').sort((a,b) => new Date(b.date)-new Date(a.date))[0]
+  const daysLTI = lastLTI ? Math.floor((today - new Date(lastLTI.date)) / 86400000) : 'None'
+  const overdueActions = actions.filter(a => a.status !== 'closed' && new Date(a.due_date) < today).length
+  const criticalHazards = hazards.filter(h => h.status === 'active' && h.risk_level === 'Critical').length
+  const overdueHazardReview = hazards.filter(h => h.status === 'active' && h.review_date && new Date(h.review_date) < today).length
+  const timeLossIncidents = incidents.filter(i => i.type === 'Time-Loss Injury').length
 
-    setStats({ incidents: incidents.length, openIncidents, inspections: inspections.length, avgScore, workers: workers.length, expiring, daysLTI })
-    setLoading(false)
-  }
+  setStats({
+    incidents: incidents.length, openIncidents, inspections: inspections.length,
+    avgScore, workers: workers.length, expiring, expired, daysLTI,
+    overdueActions, criticalHazards, overdueHazardReview, timeLossIncidents,
+    activeHazards: hazards.filter(h => h.status === 'active').length,
+    openActions: actions.filter(a => a.status !== 'closed').length,
+  })
+  setLoading(false)
+}
 
 const kpis = [
   { label: 'Open Incidents', value: stats.openIncidents, unit: '', color: stats.openIncidents > 0 ? 'var(--red)' : 'var(--green)', accent: stats.openIncidents > 0 ? 'var(--red)' : 'var(--green)', delta: `${stats.incidents} total logged`, page: 'incidents' },
@@ -214,6 +220,91 @@ const modules = [
           </div>
         ))}
       </div>
+      
+      {/* ALERTS */}
+      {(stats.overdueActions > 0 || stats.criticalHazards > 0 || stats.expired > 0 || stats.timeLossIncidents > 0 || stats.overdueHazardReview > 0) && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Action Required</span>
+            <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+          </div>
+
+          {stats.timeLossIncidents > 0 && (
+            <div style={{ background: 'var(--red-light)', border: '1px solid rgba(197,48,48,0.2)', borderLeft: '3px solid var(--red)', borderRadius: 6, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              onClick={() => setPage('incidents')} className="alert-row">
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--red)', marginBottom: 2 }}>
+                  🚨 NS OHS Notification Required
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-2)' }}>
+                  {stats.timeLossIncidents} Time-Loss Injury recorded — must notify NS Dept. of Labour within 24h
+                </div>
+              </div>
+              <span style={{ fontSize: 11, color: 'var(--red)', fontWeight: 600, whiteSpace: 'nowrap', marginLeft: 16 }}>View →</span>
+            </div>
+          )}
+
+          {stats.criticalHazards > 0 && (
+            <div style={{ background: 'var(--red-light)', border: '1px solid rgba(197,48,48,0.2)', borderLeft: '3px solid var(--red)', borderRadius: 6, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+              onClick={() => setPage('hazards')}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--red)', marginBottom: 2 }}>
+                  ⚠ {stats.criticalHazards} Critical Hazard{stats.criticalHazards > 1 ? 's' : ''} Active
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-2)' }}>
+                  Critical risk level requires immediate control measures — NS OHS §13
+                </div>
+              </div>
+              <span style={{ fontSize: 11, color: 'var(--red)', fontWeight: 600, whiteSpace: 'nowrap', marginLeft: 16 }}>View →</span>
+            </div>
+          )}
+
+          {stats.overdueActions > 0 && (
+            <div style={{ background: 'var(--orange-light)', border: '1px solid rgba(192,86,33,0.2)', borderLeft: '3px solid var(--orange)', borderRadius: 6, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+              onClick={() => setPage('incidents')}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--orange)', marginBottom: 2 }}>
+                  {stats.overdueActions} Overdue Corrective Action{stats.overdueActions > 1 ? 's' : ''}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-2)' }}>
+                  Open corrective actions past due date — review and update status
+                </div>
+              </div>
+              <span style={{ fontSize: 11, color: 'var(--orange)', fontWeight: 600, whiteSpace: 'nowrap', marginLeft: 16 }}>View →</span>
+            </div>
+          )}
+
+          {stats.expired > 0 && (
+            <div style={{ background: 'var(--orange-light)', border: '1px solid rgba(192,86,33,0.2)', borderLeft: '3px solid var(--orange)', borderRadius: 6, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+              onClick={() => setPage('training')}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--orange)', marginBottom: 2 }}>
+                  {stats.expired} Expired Certification{stats.expired > 1 ? 's' : ''}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-2)' }}>
+                  Workers with expired certifications must not perform regulated tasks
+                </div>
+              </div>
+              <span style={{ fontSize: 11, color: 'var(--orange)', fontWeight: 600, whiteSpace: 'nowrap', marginLeft: 16 }}>View →</span>
+            </div>
+          )}
+
+          {stats.overdueHazardReview > 0 && (
+            <div style={{ background: 'var(--amber-light)', border: '1px solid rgba(183,121,31,0.2)', borderLeft: '3px solid var(--amber)', borderRadius: 6, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+              onClick={() => setPage('hazards')}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--amber)', marginBottom: 2 }}>
+                  {stats.overdueHazardReview} Hazard Review{stats.overdueHazardReview > 1 ? 's' : ''} Overdue
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-2)' }}>
+                  Regular hazard review required under NS OHS Act §9 — update or resolve
+                </div>
+              </div>
+              <span style={{ fontSize: 11, color: 'var(--amber)', fontWeight: 600, whiteSpace: 'nowrap', marginLeft: 16 }}>View →</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* DIVIDER LABEL */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>

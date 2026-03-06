@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import ExportPDFButton from '../ExportPDFButton'
 
 const INCIDENT_TYPES = ['Verbal Harassment', 'Physical Harassment', 'Sexual Harassment', 'Workplace Violence', 'Bullying', 'Discrimination', 'Intimidation', 'Other']
 const REPORTER_TYPES = ['Employee', 'Supervisor', 'Manager', 'Contractor', 'Third Party']

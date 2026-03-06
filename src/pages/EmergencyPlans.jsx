@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import ExportPDFButton from '../ExportPDFButton'
 
 const PLAN_TYPES = ['Fire', 'Medical Emergency', 'Chemical Spill', 'Severe Weather', 'Evacuation', 'Power Failure', 'Workplace Violence', 'Natural Disaster', 'Pandemic / Communicable Disease', 'Other']
 const PLAN_ICONS = { 'Fire': '🔥', 'Medical Emergency': '🚑', 'Chemical Spill': '☣', 'Severe Weather': '🌩', 'Evacuation': '🚪', 'Power Failure': '⚡', 'Workplace Violence': '🛡', 'Natural Disaster': '🌊', 'Pandemic / Communicable Disease': '🦠', 'Other': '📋' }

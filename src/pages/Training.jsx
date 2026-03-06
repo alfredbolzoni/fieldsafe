@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import ExportPDFButton from '../ExportPDFButton'
 
 const CERT_TYPES = ['WHMIS 2015', 'First Aid Level C', 'Fall Arrest', 'TDG', 'JHSC', 'Confined Space', 'Electrical Safety', 'Other']
 const ROLES = ['Carpenter', 'Ironworker', 'Electrician', 'Labourer', 'Site Supervisor', 'Heavy Equipment Operator', 'HSE Officer', 'Other']

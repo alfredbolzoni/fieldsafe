@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import ExportPDFButton from '../ExportPDFButton'
 
 const HAZARD_CLASSES = [
   'Flammable Liquid', 'Flammable Gas', 'Flammable Solid',

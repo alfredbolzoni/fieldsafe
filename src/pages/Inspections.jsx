@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import ExportPDFButton from '../ExportPDFButton'
 
 const CHECKLIST = [
   { label: 'PPE available and in good condition', sub: 'Hard hats, vests, gloves, safety boots' },

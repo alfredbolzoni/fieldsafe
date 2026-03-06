@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import ExportPDFButton from '../ExportPDFButton'
 
 // WCB Nova Scotia Construction Sector Benchmarks 2023
 const WCB_BENCHMARKS = {

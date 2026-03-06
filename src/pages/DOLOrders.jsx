@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import ExportPDFButton from '../ExportPDFButton'
 
 const ORDER_TYPES = ['Compliance Order', 'Stop Work Order', 'Improvement Order', 'Prohibition Order', 'Administrative Penalty', 'Inspection Report']
 

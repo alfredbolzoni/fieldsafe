@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import ExportPDFButton from '../ExportPDFButton'
 
 const STEPS = ['open', 'supervisor_investigation', 'johsc_escalation', 'resolved']
 const STEP_LABELS = { open: 'Reported', supervisor_investigation: 'Supervisor Investigation', johsc_escalation: 'JOHSC Escalation', resolved: 'Resolved' }

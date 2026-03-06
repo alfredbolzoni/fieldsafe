@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import ExportPDFButton from '../ExportPDFButton'
 
 const PRIORITIES = ['Low', 'Medium', 'High', 'Critical']
 
@@ -169,6 +170,7 @@ async function handleCloseAction(id) {
         <div className="page-actions">
           <button className="btn btn-secondary" onClick={() => { setShowActionForm(true) }}>+ Corrective Action</button>
           <button className="btn btn-primary" onClick={() => setShowForm(true)}>+ Log Incident</button>
+          <ExportPDFButton moduleKey="incidents" rows={incidents} />
         </div>
       </div>
 

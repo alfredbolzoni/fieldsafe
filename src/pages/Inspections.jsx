@@ -100,6 +100,8 @@ export default function Inspections() {
       inspection_id: inspection.id,
       label: item.label,
       sub: item.sub,
+      category: item.category,
+      ref: item.ref,
       result: 'pending',
       user_id: user.id,
       note: '',
@@ -152,7 +154,6 @@ export default function Inspections() {
   async function syncScore(updatedItems) {
     const passed  = updatedItems.filter(i => i.result === 'pass').length
     const failed  = updatedItems.filter(i => i.result === 'fail').length
-    const na      = updatedItems.filter(i => i.result === 'na').length
     const pending = updatedItems.filter(i => i.result === 'pending').length
     const scored  = passed + failed
     const score   = scored > 0 ? Math.round((passed / scored) * 100) : 0
@@ -225,96 +226,101 @@ export default function Inspections() {
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 280px', gap: 20, alignItems: 'start' }}>
 
           {/* CHECKLIST BY CATEGORY */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            {CATEGORIES.map(cat => {
-              const catItems = items.filter(i => {
-                const def = CHECKLIST.find(c => c.label === i.label)
-                return def?.category === cat
-              })
-              if (catItems.length === 0) return null
-              const catFailed  = catItems.filter(i => i.result === 'fail').length
-              const catPending = catItems.filter(i => i.result === 'pending').length
+          {(() => {
+            // Derive categories from DB items — supports old inspections with different labels
+            const getItemCategory = i => i.category || CHECKLIST.find(c => c.label === i.label)?.category || 'Other'
+            const getItemRef      = i => i.ref      || CHECKLIST.find(c => c.label === i.label)?.ref      || ''
+            const activeCategories = [...new Set(items.map(getItemCategory))]
 
-              return (
-                <div key={cat}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.7px' }}>{cat}</div>
-                    <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-                    <div style={{ fontSize: 10, color: catFailed > 0 ? 'var(--red)' : catPending > 0 ? 'var(--text-3)' : 'var(--green)', fontWeight: 600 }}>
-                      {catPending > 0 ? `${catPending} pending` : catFailed > 0 ? `${catFailed} failed` : '✓ complete'}
-                    </div>
-                  </div>
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                {activeCategories.map(cat => {
+                  const catItems = items.filter(i => getItemCategory(i) === cat)
+                  const catFailed  = catItems.filter(i => i.result === 'fail').length
+                  const catPending = catItems.filter(i => i.result === 'pending').length
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {catItems.map(item => {
-                      const def = CHECKLIST.find(c => c.label === item.label)
-                      const isFail = item.result === 'fail'
-                      const isPass = item.result === 'pass'
-                      const isNA   = item.result === 'na'
-                      const noteVal = noteInputs[item.id] !== undefined ? noteInputs[item.id] : (item.note || '')
-
-                      return (
-                        <div key={item.id} style={{
-                          background: isPass ? 'var(--green-light)' : isFail ? 'var(--red-light)' : isNA ? 'var(--surface-2)' : 'var(--surface)',
-                          border: `1px solid ${isPass ? 'rgba(52,199,89,0.2)' : isFail ? 'rgba(255,59,48,0.2)' : 'var(--border)'}`,
-                          borderLeft: `3px solid ${isPass ? 'var(--green)' : isFail ? 'var(--red)' : isNA ? 'var(--border-strong)' : 'var(--border)'}`,
-                          borderRadius: 8, padding: '10px 14px',
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 2, color: isNA ? 'var(--text-3)' : 'var(--text-1)' }}>{item.label}</div>
-                              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
-                                {item.sub}
-                                {def?.ref && <span style={{ marginLeft: 6, color: 'var(--primary)', fontWeight: 600 }}>{def.ref}</span>}
-                              </div>
-                            </div>
-                            <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
-                              <button
-                                onClick={() => setResult(item.id, isPass ? 'pending' : 'pass')}
-                                style={{ padding: '4px 11px', borderRadius: 5, border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer', background: isPass ? 'var(--green)' : 'var(--green-light)', color: isPass ? '#fff' : 'var(--green)' }}>
-                                ✓ Pass
-                              </button>
-                              <button
-                                onClick={() => setResult(item.id, isFail ? 'pending' : 'fail')}
-                                style={{ padding: '4px 11px', borderRadius: 5, border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer', background: isFail ? 'var(--red)' : 'var(--red-light)', color: isFail ? '#fff' : 'var(--red)' }}>
-                                ✗ Fail
-                              </button>
-                              <button
-                                onClick={() => setResult(item.id, isNA ? 'pending' : 'na')}
-                                style={{ padding: '4px 10px', borderRadius: 5, border: `1px solid ${isNA ? 'var(--border-strong)' : 'var(--border)'}`, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: isNA ? 'var(--surface-2)' : 'transparent', color: isNA ? 'var(--text-2)' : 'var(--text-3)' }}>
-                                N/A
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Fail note */}
-                          {isFail && (
-                            <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                              <textarea
-                                style={{ flex: 1, fontSize: 11, padding: '6px 10px', borderRadius: 5, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-1)', resize: 'vertical', minHeight: 48, fontFamily: 'inherit' }}
-                                placeholder="Describe the deficiency and immediate action taken…"
-                                value={noteVal}
-                                onChange={e => setNoteInputs(prev => ({ ...prev, [item.id]: e.target.value }))}
-                              />
-                              <button
-                                className="btn btn-ghost"
-                                style={{ padding: '5px 12px', fontSize: 11, flexShrink: 0 }}
-                                onClick={() => saveNote(item.id)}>
-                                Save note
-                              </button>
-                            </div>
-                          )}
-                          {!isFail && item.note && (
-                            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic' }}>Note: {item.note}</div>
-                          )}
+                  return (
+                    <div key={cat}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.7px' }}>{cat}</div>
+                        <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+                        <div style={{ fontSize: 10, color: catFailed > 0 ? 'var(--red)' : catPending > 0 ? 'var(--text-3)' : 'var(--green)', fontWeight: 600 }}>
+                          {catPending > 0 ? `${catPending} pending` : catFailed > 0 ? `${catFailed} failed` : '✓ complete'}
                         </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {catItems.map(item => {
+                          const isFail = item.result === 'fail'
+                          const isPass = item.result === 'pass'
+                          const isNA   = item.result === 'na'
+                          const ref    = getItemRef(item)
+                          const noteVal = noteInputs[item.id] !== undefined ? noteInputs[item.id] : (item.note || '')
+
+                          return (
+                            <div key={item.id} style={{
+                              background: isPass ? 'var(--green-light)' : isFail ? 'var(--red-light)' : isNA ? 'var(--surface-2)' : 'var(--surface)',
+                              border: `1px solid ${isPass ? 'rgba(52,199,89,0.2)' : isFail ? 'rgba(255,59,48,0.2)' : 'var(--border)'}`,
+                              borderLeft: `3px solid ${isPass ? 'var(--green)' : isFail ? 'var(--red)' : isNA ? 'var(--border-strong)' : 'var(--border)'}`,
+                              borderRadius: 8, padding: '10px 14px',
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 2, color: isNA ? 'var(--text-3)' : 'var(--text-1)' }}>{item.label}</div>
+                                  <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                                    {item.sub}
+                                    {ref && <span style={{ marginLeft: 6, color: 'var(--primary)', fontWeight: 600 }}>{ref}</span>}
+                                  </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+                                  <button
+                                    onClick={() => setResult(item.id, isPass ? 'pending' : 'pass')}
+                                    style={{ padding: '4px 11px', borderRadius: 5, border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer', background: isPass ? 'var(--green)' : 'var(--green-light)', color: isPass ? '#fff' : 'var(--green)' }}>
+                                    ✓ Pass
+                                  </button>
+                                  <button
+                                    onClick={() => setResult(item.id, isFail ? 'pending' : 'fail')}
+                                    style={{ padding: '4px 11px', borderRadius: 5, border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer', background: isFail ? 'var(--red)' : 'var(--red-light)', color: isFail ? '#fff' : 'var(--red)' }}>
+                                    ✗ Fail
+                                  </button>
+                                  <button
+                                    onClick={() => setResult(item.id, isNA ? 'pending' : 'na')}
+                                    style={{ padding: '4px 10px', borderRadius: 5, border: `1px solid ${isNA ? 'var(--border-strong)' : 'var(--border)'}`, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: isNA ? 'var(--surface-2)' : 'transparent', color: isNA ? 'var(--text-2)' : 'var(--text-3)' }}>
+                                    N/A
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Fail note */}
+                              {isFail && (
+                                <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                                  <textarea
+                                    style={{ flex: 1, fontSize: 11, padding: '6px 10px', borderRadius: 5, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-1)', resize: 'vertical', minHeight: 48, fontFamily: 'inherit' }}
+                                    placeholder="Describe the deficiency and immediate action taken…"
+                                    value={noteVal}
+                                    onChange={e => setNoteInputs(prev => ({ ...prev, [item.id]: e.target.value }))}
+                                  />
+                                  <button
+                                    className="btn btn-ghost"
+                                    style={{ padding: '5px 12px', fontSize: 11, flexShrink: 0 }}
+                                    onClick={() => saveNote(item.id)}>
+                                    Save note
+                                  </button>
+                                </div>
+                              )}
+                              {!isFail && item.note && (
+                                <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic' }}>Note: {item.note}</div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()}
 
           {/* SCORE SIDEBAR */}
           <div style={{ position: 'sticky', top: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>

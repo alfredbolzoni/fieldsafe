@@ -116,9 +116,12 @@ export default function Hazards() {
           <h1 className="page-title">Hazard Register</h1>
           <p className="page-sub">Identify · Assess · Control · NS OHS Act compliant risk register</p>
         </div>
-        <button className="btn btn-primary" onClick={() => { setForm(emptyForm); setEditHazard(null); setShowForm(true) }}>
-          + Register Hazard
-        </button>
+        <div className="page-actions">
+          <ExportPDFButton moduleKey="hazards" rows={filtered} />
+          <button className="btn btn-primary" onClick={() => { setForm(emptyForm); setEditHazard(null); setShowForm(true) }}>
+            + Register Hazard
+          </button>
+        </div>
       </div>
 
       {/* OVERDUE ALERT */}

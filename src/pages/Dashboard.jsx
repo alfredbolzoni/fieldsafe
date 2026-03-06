@@ -129,7 +129,7 @@ export default function Dashboard() {
         {page === 'resources' && <ResourcesAI />}
       </main>
 
-      <AIFloatingChat page={page} />
+      <AIFloatingChat page={page} setPage={setPage} />
     </div>
   )
 }

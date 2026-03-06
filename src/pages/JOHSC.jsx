@@ -88,10 +88,6 @@ export default function JOHSC() {
     return status !== 'closed' && date && new Date(date) < new Date()
   }
 
-  function daysSince(date) {
-    return Math.floor((new Date() - new Date(date)) / 86400000)
-  }
-
   function daysUntilResponse(meetingDate) {
     const deadline = new Date(meetingDate)
     deadline.setDate(deadline.getDate() + 21)

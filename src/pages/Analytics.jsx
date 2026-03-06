@@ -31,9 +31,7 @@ export default function Analytics() {
   // ── CALCULATIONS ──
   const openIncidents = incidents.filter(i => i.status === 'open').length
   const closedIncidents = incidents.filter(i => i.status === 'closed').length
-  const highSeverity = incidents.filter(i => i.severity === 'High').length
   const timeLoss = incidents.filter(i => i.type === 'Time-Loss Injury').length
-  const nearMiss = incidents.filter(i => i.type === 'Near-Miss').length
 
   const totalWorkers = workers.length || 1
   const trir = totalWorkers > 0 ? ((incidents.length / (totalWorkers * 200000)) * 200000).toFixed(1) : 0
@@ -66,10 +64,6 @@ export default function Analytics() {
   const byType = ['Near-Miss', 'Minor Injury', 'Time-Loss Injury', 'Property Damage', 'Hazard Observation']
     .map(type => ({ type, count: incidents.filter(i => i.type === type).length }))
     .filter(t => t.count > 0)
-
-  // Incidents by severity
-  const bySeverity = ['High', 'Medium', 'Low']
-    .map(sev => ({ sev, count: incidents.filter(i => i.severity === sev).length }))
 
   // Monthly trend (last 6 months)
   const months = []

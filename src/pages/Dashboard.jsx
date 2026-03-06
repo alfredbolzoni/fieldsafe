@@ -12,22 +12,6 @@ export default function Dashboard() {
     await supabase.auth.signOut()
   }
 
-  const nav = [
-    { section: 'Overview', items: [
-      { id: 'dashboard', icon: '⬛', label: 'Dashboard' },
-    ]},
-    { section: 'Operations', items: [
-      { id: 'incidents', icon: '🚨', label: 'Incidents' },
-      { id: 'inspections', icon: '✅', label: 'Inspections' },
-    ]},
-    { section: 'People', items: [
-      { id: 'training', icon: '🎓', label: 'Training' },
-    ]},
-    { section: 'Insights', items: [
-      { id: 'analytics', icon: '📈', label: 'Analytics' },
-    ]},
-  ]
-
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
 
@@ -98,7 +82,7 @@ export default function Dashboard() {
 
 function DashboardHome({ setPage }) {
   const [stats, setStats] = useState({ incidents: 0, openIncidents: 0, inspections: 0, avgScore: 0, workers: 0, expiring: 0, daysLTI: '0' })
-const [loading, setLoading] = useState(true)
+const [, setLoading] = useState(true)
   const now = new Date()
   const timeStr = now.toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' })
   const dateStr = now.toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' })

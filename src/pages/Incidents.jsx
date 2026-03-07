@@ -21,6 +21,7 @@ export default function Incidents() {
   const [expandedIncident, setExpandedIncident] = useState(null)
   const [tab, setTab] = useState('open')
   const [submitting, setSubmitting] = useState(false)
+  const [detailIncident, setDetailIncident] = useState(null)
 
   // Workflow state
   const [activePhase, setActivePhase] = useState({})   // { incId: 0|1|2|3 }
@@ -315,8 +316,12 @@ export default function Incidents() {
                       </td>
                       <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>{inc.date}</td>
                       <td><span className="pill pill-blue">{inc.type}</span></td>
-                      <td style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inc.description}</div>
+                      <td style={{ maxWidth: 240 }}>
+                        <div
+                          onClick={() => setDetailIncident(inc)}
+                          style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer', color: 'var(--primary)', fontWeight: 600, textDecoration: 'underline' }}
+                          title="Click to view full description"
+                        >{inc.description}</div>
                         <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>{inc.location} · {inc.reported_by}</div>
                       </td>
                       <td><span className={`pill ${sevPill[inc.severity] || 'pill-gray'}`}>{inc.severity}</span></td>
@@ -847,6 +852,71 @@ export default function Incidents() {
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => { setShowActionForm(false); setSelectedIncident(null) }}>Cancel</button>
               <button className="btn btn-primary" onClick={handleAddAction}>Save Action</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* INCIDENT DETAIL MODAL */}
+      {detailIncident && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setDetailIncident(null)}>
+          <div className="modal" style={{ maxWidth: 560 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+              <div>
+                <div className="modal-title" style={{ marginBottom: 4 }}>Incident Details</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <span className="pill pill-blue">{detailIncident.type}</span>
+                  <span className={`pill ${sevPill[detailIncident.severity] || 'pill-gray'}`}>{detailIncident.severity}</span>
+                  <span className={`pill ${detailIncident.status === 'open' ? 'pill-red' : 'pill-green'}`}>{detailIncident.status === 'open' ? 'Open' : 'Closed'}</span>
+                </div>
+              </div>
+              <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 18, lineHeight: 1 }} onClick={() => setDetailIncident(null)}>×</button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 3 }}>Date</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{detailIncident.date}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 3 }}>Location</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{detailIncident.location}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 3 }}>Reported By</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{detailIncident.reported_by}</div>
+              </div>
+              {detailIncident.ns_ohs_class && (
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 3 }}>NS OHS Class</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: detailIncident.notification_required ? 'var(--red)' : 'var(--text-1)' }}>{detailIncident.ns_ohs_class}</div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6 }}>Description</div>
+              <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text-1)', background: 'var(--surface-2)', borderRadius: 6, padding: '10px 14px', whiteSpace: 'pre-wrap' }}>
+                {detailIncident.description}
+              </div>
+            </div>
+
+            {detailIncident.notification_required && (
+              <div className="alert alert-warn" style={{ marginBottom: 16, padding: '10px 14px' }}>
+                <div className="alert-title" style={{ fontSize: 12 }}>⚠ Regulatory notification required</div>
+                <div className="alert-body" style={{ fontSize: 11, marginTop: 2 }}>{detailIncident.notification_deadline}</div>
+              </div>
+            )}
+
+            {detailIncident.root_cause && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 4 }}>Root Cause</div>
+                <div style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.5 }}>{detailIncident.root_cause}</div>
+              </div>
+            )}
+
+            <div className="modal-footer" style={{ paddingTop: 12 }}>
+              <button className="btn btn-secondary" onClick={() => setDetailIncident(null)}>Close</button>
             </div>
           </div>
         </div>

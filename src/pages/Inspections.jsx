@@ -131,6 +131,11 @@ export default function Inspections() {
     setView('active')
   }
 
+  async function closeInspection(id) {
+    await supabase.from('inspections').update({ status: 'completed' }).eq('id', id)
+    fetchInspections()
+  }
+
   async function setResult(itemId, result) {
     await supabase.from('inspection_items').update({ result }).eq('id', itemId)
     const updated = items.map(i => i.id === itemId ? { ...i, result } : i)
@@ -568,6 +573,11 @@ export default function Inspections() {
                     {(ins.status === 'in-progress' || ins.status === 'in_progress') && (
                       <button className="btn btn-primary" style={{ padding: '3px 10px', fontSize: 11 }} onClick={() => resumeInspection(ins)}>
                         Resume →
+                      </button>
+                    )}
+                    {(ins.status === 'action-required' || ins.status === 'failed') && (
+                      <button className="btn btn-ghost" style={{ padding: '3px 10px', fontSize: 11 }} onClick={() => closeInspection(ins.id)}>
+                        Close →
                       </button>
                     )}
                   </td>

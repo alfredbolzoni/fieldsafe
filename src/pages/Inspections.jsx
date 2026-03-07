@@ -219,9 +219,9 @@ export default function Inspections() {
       </tr>`).join('')}
     </tbody></table>` : '<p style="color:#888;font-style:italic">No checklist items on record for this inspection.</p>'}
     <div class="footer">FieldSafe HSE Management System &middot; Generated ${new Date().toLocaleDateString()}</div>
-    <script>window.onload=function(){window.print()}</script>
     </body></html>`)
     w.document.close()
+    setTimeout(() => w.print(), 400)
   }
 
   async function setResult(itemId, result) {
@@ -538,8 +538,7 @@ export default function Inspections() {
       {inspections.length > 0 && (() => {
         const kpiInProgress = inspections.filter(i => i.status === 'in-progress' || i.status === 'in_progress').length
         const kpiPassed = inspections.filter(i =>
-          (i.status === 'completed' || i.status === 'passed') &&
-          (!i.failed || i.failed === 0)
+          i.status === 'completed' || i.status === 'passed'
         ).length
         const kpiActions = inspections.filter(i => i.status === 'action-required').length
         const kpiFailed = inspections.filter(i => i.status === 'failed').length
@@ -757,56 +756,84 @@ export default function Inspections() {
               </div>
             )}
 
-            {detailItems.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>
-                  Checklist Items
-                  {detailInspection.status === 'action-required' && (
-                    <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--amber)', fontWeight: 600, textTransform: 'none' }}>— add corrective action notes on failed items below</span>
-                  )}
-                </div>
-                <div style={{ maxHeight: 300, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 6 }}>
-                  {(() => {
-                    const cats = [...new Set(detailItems.map(i => i.category))]
-                    return cats.map(cat => (
-                      <div key={cat}>
-                        <div style={{ padding: '6px 10px', background: 'var(--surface-2)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-3)', borderBottom: '1px solid var(--border)' }}>{cat}</div>
-                        {detailItems.filter(i => i.category === cat).map(item => (
-                          <div key={item.id} style={{ padding: '8px 10px', borderBottom: '1px solid var(--border)', background: item.result === 'fail' ? 'rgba(220,38,38,0.04)' : 'transparent' }}>
-                            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                              <span style={{ fontSize: 11, fontWeight: 700, minWidth: 36, color: item.result === 'pass' ? 'var(--green)' : item.result === 'fail' ? 'var(--red)' : item.result === 'na' ? 'var(--text-3)' : 'var(--amber)' }}>
-                                {item.result === 'pass' ? 'PASS' : item.result === 'fail' ? 'FAIL' : item.result === 'na' ? 'N/A' : 'PEND'}
-                              </span>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 12, fontWeight: 500 }}>{item.label}</div>
-                                {item.result !== 'fail' && item.note && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2, fontStyle: 'italic' }}>{item.note}</div>}
-                              </div>
+            {detailItems.length > 0 && (() => {
+              const failedItems = detailItems.filter(i => i.result === 'fail')
+              const passedItems = detailItems.filter(i => i.result === 'pass')
+              const naItems    = detailItems.filter(i => i.result === 'na')
+              return (
+                <div style={{ marginBottom: 16 }}>
+                  {/* Result summary bar */}
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                    {[
+                      { label: `✓ ${passedItems.length} Passed`, color: 'var(--green)', bg: 'rgba(52,199,89,0.08)' },
+                      { label: `✗ ${failedItems.length} Failed`, color: 'var(--red)', bg: 'rgba(255,59,48,0.08)' },
+                      { label: `— ${naItems.length} N/A`, color: 'var(--text-3)', bg: 'var(--surface-2)' },
+                    ].map((s, i) => (
+                      <div key={i} style={{ flex: 1, textAlign: 'center', padding: '6px 4px', borderRadius: 6, background: s.bg, fontSize: 11, fontWeight: 700, color: s.color }}>
+                        {s.label}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Failed items — always shown first and expanded */}
+                  {failedItems.length > 0 && (
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--red)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6 }}>
+                        Failed Items — corrective action required
+                      </div>
+                      <div style={{ border: '1px solid rgba(255,59,48,0.3)', borderRadius: 6, overflow: 'hidden' }}>
+                        {failedItems.map((item, idx) => (
+                          <div key={item.id} style={{ padding: '8px 10px', borderBottom: idx < failedItems.length - 1 ? '1px solid rgba(255,59,48,0.15)' : 'none', background: 'rgba(220,38,38,0.04)' }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--red)', marginBottom: 2 }}>✗ {item.label}</div>
+                            <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 6 }}>{item.category}</div>
+                            <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+                              <textarea
+                                style={{ flex: 1, fontSize: 11, padding: '5px 8px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-1)', resize: 'vertical', minHeight: 44, fontFamily: 'inherit' }}
+                                placeholder="Corrective action taken / deficiency note…"
+                                value={detailItemNotes[item.id] !== undefined ? detailItemNotes[item.id] : (item.note || '')}
+                                onChange={e => setDetailItemNotes(prev => ({ ...prev, [item.id]: e.target.value }))}
+                              />
+                              <button
+                                className="btn btn-ghost"
+                                style={{ padding: '4px 10px', fontSize: 10, flexShrink: 0 }}
+                                onClick={() => saveDetailItemNote(item.id)}
+                              >
+                                Save
+                              </button>
                             </div>
-                            {item.result === 'fail' && (
-                              <div style={{ marginTop: 6, display: 'flex', gap: 6, alignItems: 'flex-start', paddingLeft: 44 }}>
-                                <textarea
-                                  style={{ flex: 1, fontSize: 11, padding: '5px 8px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-1)', resize: 'vertical', minHeight: 44, fontFamily: 'inherit' }}
-                                  placeholder="Corrective action taken / deficiency note…"
-                                  value={detailItemNotes[item.id] !== undefined ? detailItemNotes[item.id] : (item.note || '')}
-                                  onChange={e => setDetailItemNotes(prev => ({ ...prev, [item.id]: e.target.value }))}
-                                />
-                                <button
-                                  className="btn btn-ghost"
-                                  style={{ padding: '4px 10px', fontSize: 10, flexShrink: 0 }}
-                                  onClick={() => saveDetailItemNote(item.id)}
-                                >
-                                  Save
-                                </button>
-                              </div>
-                            )}
                           </div>
                         ))}
                       </div>
-                    ))
-                  })()}
+                    </div>
+                  )}
+
+                  {/* Full checklist — collapsed into a scrollable box */}
+                  <details>
+                    <summary style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', cursor: 'pointer', marginBottom: 6, userSelect: 'none' }}>
+                      Full Checklist ({detailItems.length} items)
+                    </summary>
+                    <div style={{ maxHeight: 220, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 6, marginTop: 6 }}>
+                      {[...new Set(detailItems.map(i => i.category))].map(cat => (
+                        <div key={cat}>
+                          <div style={{ padding: '5px 10px', background: 'var(--surface-2)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-3)', borderBottom: '1px solid var(--border)' }}>{cat}</div>
+                          {detailItems.filter(i => i.category === cat).map(item => (
+                            <div key={item.id} style={{ padding: '6px 10px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8, alignItems: 'flex-start', background: item.result === 'fail' ? 'rgba(220,38,38,0.04)' : 'transparent' }}>
+                              <span style={{ fontSize: 10, fontWeight: 700, minWidth: 32, color: item.result === 'pass' ? 'var(--green)' : item.result === 'fail' ? 'var(--red)' : item.result === 'na' ? 'var(--text-3)' : 'var(--amber)' }}>
+                                {item.result === 'pass' ? 'PASS' : item.result === 'fail' ? 'FAIL' : item.result === 'na' ? 'N/A' : 'PEND'}
+                              </span>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 11, fontWeight: 500 }}>{item.label}</div>
+                                {item.note && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1, fontStyle: 'italic' }}>{item.note}</div>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  </details>
                 </div>
-              </div>
-            )}
+              )
+            })()}
             {detailItems.length === 0 && (
               <div style={{ fontSize: 12, color: 'var(--text-3)', fontStyle: 'italic', marginBottom: 16 }}>Loading checklist items…</div>
             )}

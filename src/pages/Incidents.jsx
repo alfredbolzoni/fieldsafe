@@ -254,9 +254,9 @@ export default function Incidents() {
       <div><div class="label">Closure Date</div><div class="value">${inc.hse_signed_date}</div></div>
     </div>` : ''}
     <div class="footer">FieldSafe HSE Management System &middot; Generated ${new Date().toLocaleDateString()}</div>
-    <script>window.onload=function(){window.print()}</script>
     </body></html>`)
     w.document.close()
+    setTimeout(() => w.print(), 400)
   }
 
   const sevPill = { Low: 'pill-green', Medium: 'pill-amber', High: 'pill-orange', Critical: 'pill-red' }

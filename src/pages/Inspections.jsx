@@ -175,11 +175,13 @@ export default function Inspections() {
   function statusPill(status) {
     const map = {
       'passed':          { cls: 'pill-green', label: '✓ Passed' },
+      'completed':       { cls: 'pill-green', label: '✓ Completed' },
       'failed':          { cls: 'pill-red',   label: '✗ Failed' },
       'action-required': { cls: 'pill-amber', label: '⚠ Actions Required' },
       'in-progress':     { cls: 'pill-blue',  label: '● In Progress' },
+      'in_progress':     { cls: 'pill-blue',  label: '● In Progress' },
     }
-    const s = map[status] || map['in-progress']
+    const s = map[status] || { cls: 'pill-blue', label: '● In Progress' }
     return <span className={`pill ${s.cls}`}>{s.label}</span>
   }
 
@@ -197,7 +199,7 @@ export default function Inspections() {
     const pending = items.filter(i => i.result === 'pending').length
     const scored  = passed + failed
     const score   = scored > 0 ? Math.round((passed / scored) * 100) : 0
-    const allDone = pending === 0
+    const allDone = items.length > 0 && pending === 0
 
     return (
       <div className="page-wrap">
@@ -219,10 +221,11 @@ export default function Inspections() {
         {/* RECOVERY BANNER — inspection exists but has no items (e.g. created via seed/SQL) */}
         {items.length === 0 && (
           <div className="alert alert-warn" style={{ marginBottom: 16 }}>
-            <div className="alert-title">⚠ This inspection has no checklist items loaded.</div>
+            <div className="alert-title">⚠ This inspection has no checklist items.</div>
             <div className="alert-body" style={{ marginTop: 4 }}>
-              This can happen with inspections created outside the app.<br />
-              Click "Load Checklist" to generate the standard {CHECKLIST.length}-item checklist for this inspection.
+              This can happen with inspections imported or created outside the standard flow.<br />
+              Click "Load Checklist" to generate the standard {CHECKLIST.length}-item checklist for this inspection,
+              or mark it as Complete if the inspection was already conducted manually.
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
               <button
@@ -255,6 +258,24 @@ export default function Inspections() {
               </button>
               <button
                 className="btn btn-secondary"
+                onClick={async () => {
+                  try {
+                    const { error } = await supabase
+                      .from('inspections')
+                      .update({ status: 'completed' })
+                      .eq('id', activeInspection.id)
+                    if (error) throw error
+                    setView('list')
+                    fetchInspections()
+                  } catch (err) {
+                    alert('Failed to update status: ' + (err.message || 'Unknown error'))
+                  }
+                }}
+                disabled={saving}>
+                Mark as Complete
+              </button>
+              <button
+                className="btn btn-ghost"
                 onClick={() => { setView('list'); fetchInspections() }}>
                 Cancel
               </button>
@@ -530,7 +551,7 @@ export default function Inspections() {
                   <td><span style={{ color: ins.failed > 0 ? 'var(--red)' : 'var(--text-3)', fontWeight: 700, fontSize: 13 }}>✗ {ins.failed || 0}</span></td>
                   <td>{statusPill(ins.status)}</td>
                   <td>
-                    {ins.status === 'in-progress' && (
+                    {(ins.status === 'in-progress' || ins.status === 'in_progress') && (
                       <button className="btn btn-primary" style={{ padding: '3px 10px', fontSize: 11 }} onClick={() => resumeInspection(ins)}>
                         Resume →
                       </button>

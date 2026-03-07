@@ -64,6 +64,7 @@ export default function Inspections() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [noteInputs, setNoteInputs] = useState({})   // { itemId: string }
+  const [detailInspection, setDetailInspection] = useState(null)
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
     supervisor: '',
@@ -576,8 +577,18 @@ export default function Inspections() {
                       </button>
                     )}
                     {(ins.status === 'action-required' || ins.status === 'failed') && (
-                      <button className="btn btn-ghost" style={{ padding: '3px 10px', fontSize: 11 }} onClick={() => closeInspection(ins.id)}>
-                        Close →
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button className="btn btn-ghost" style={{ padding: '3px 10px', fontSize: 11 }} onClick={() => setDetailInspection(ins)}>
+                          View →
+                        </button>
+                        <button className="btn btn-ghost" style={{ padding: '3px 10px', fontSize: 11 }} onClick={() => closeInspection(ins.id)}>
+                          Close
+                        </button>
+                      </div>
+                    )}
+                    {(ins.status === 'completed' || ins.status === 'passed') && (
+                      <button className="btn btn-ghost" style={{ padding: '3px 10px', fontSize: 11 }} onClick={() => setDetailInspection(ins)}>
+                        View →
                       </button>
                     )}
                   </td>
@@ -587,6 +598,71 @@ export default function Inspections() {
           </table>
         )}
       </div>
+
+      {/* INSPECTION DETAIL MODAL */}
+      {detailInspection && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setDetailInspection(null)}>
+          <div className="modal" style={{ maxWidth: 520 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+              <div>
+                <div className="modal-title" style={{ marginBottom: 4 }}>Inspection Report</div>
+                <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{typeLabel(detailInspection.inspection_type)}</div>
+              </div>
+              <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 18, lineHeight: 1 }} onClick={() => setDetailInspection(null)}>×</button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 3 }}>Date</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{detailInspection.date}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 3 }}>Supervisor</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{detailInspection.supervisor}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 3 }}>Location</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{detailInspection.location}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 3 }}>Status</div>
+                <div>{statusPill(detailInspection.status)}</div>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 16, padding: '14px 16px', background: 'var(--surface-2)', borderRadius: 8 }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 28, fontWeight: 800, color: scoreColor(detailInspection.score || 0) }}>{detailInspection.score || 0}%</div>
+                <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2, fontWeight: 600 }}>SCORE</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--green)' }}>{detailInspection.passed || 0}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2, fontWeight: 600 }}>PASSED</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 28, fontWeight: 800, color: (detailInspection.failed || 0) > 0 ? 'var(--red)' : 'var(--text-3)' }}>{detailInspection.failed || 0}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2, fontWeight: 600 }}>FAILED</div>
+              </div>
+            </div>
+
+            {(detailInspection.failed || 0) > 0 && (
+              <div className="alert alert-warn" style={{ marginBottom: 16, padding: '10px 14px' }}>
+                <div className="alert-title" style={{ fontSize: 12 }}>⚠ {detailInspection.failed} failed item{detailInspection.failed > 1 ? 's' : ''} recorded</div>
+                <div className="alert-body" style={{ fontSize: 11, marginTop: 2 }}>Review the inspection checklist for deficiency notes and corrective actions.</div>
+              </div>
+            )}
+
+            <div className="modal-footer" style={{ paddingTop: 12, justifyContent: 'space-between' }}>
+              {(detailInspection.status === 'action-required' || detailInspection.status === 'failed') && (
+                <button className="btn btn-secondary" onClick={() => { closeInspection(detailInspection.id); setDetailInspection(null) }}>
+                  Mark as Closed
+                </button>
+              )}
+              <button className="btn btn-ghost" onClick={() => setDetailInspection(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

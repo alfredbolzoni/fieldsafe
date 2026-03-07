@@ -66,6 +66,7 @@ export default function Inspections() {
   const [noteInputs, setNoteInputs] = useState({})   // { itemId: string }
   const [detailInspection, setDetailInspection] = useState(null)
   const [detailItems, setDetailItems] = useState([])
+  const [detailItemNotes, setDetailItemNotes] = useState({})
   const [kpiFilter, setKpiFilter] = useState(null)
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -142,6 +143,7 @@ export default function Inspections() {
   async function openDetailModal(ins) {
     setDetailInspection(ins)
     setDetailItems([])
+    setDetailItemNotes({})
     const { data: { user } } = await supabase.auth.getUser()
     const { data } = await supabase
       .from('inspection_items')
@@ -150,6 +152,12 @@ export default function Inspections() {
       .eq('user_id', user.id)
       .order('category')
     setDetailItems(data || [])
+  }
+
+  async function saveDetailItemNote(itemId) {
+    const note = detailItemNotes[itemId] ?? detailItems.find(i => i.id === itemId)?.note ?? ''
+    await supabase.from('inspection_items').update({ note }).eq('id', itemId)
+    setDetailItems(prev => prev.map(i => i.id === itemId ? { ...i, note } : i))
   }
 
   function handlePrintInspection(ins, insItems) {
@@ -244,7 +252,7 @@ export default function Inspections() {
     const failed  = items.filter(i => i.result === 'fail').length
     const scored  = passed + failed
     const score   = scored > 0 ? Math.round((passed / scored) * 100) : 0
-    const status  = failed === 0 ? 'passed' : score >= 80 ? 'action-required' : score >= 60 ? 'action-required' : 'failed'
+    const status  = failed === 0 ? 'passed' : score >= 80 ? 'passed' : score >= 60 ? 'action-required' : 'failed'
 
     await supabase.from('inspections').update({ status, score, passed, failed, pending: 0 }).eq('id', activeInspection.id)
     setView('list')
@@ -533,11 +541,8 @@ export default function Inspections() {
           (i.status === 'completed' || i.status === 'passed') &&
           (!i.failed || i.failed === 0)
         ).length
-        const kpiActions = inspections.filter(i => (i.failed || 0) > 0).length
-        const kpiFailed = inspections.filter(i =>
-          i.status === 'failed' ||
-          (i.status === 'action-required' && (i.score || 0) < 60)
-        ).length
+        const kpiActions = inspections.filter(i => i.status === 'action-required').length
+        const kpiFailed = inspections.filter(i => i.status === 'failed').length
         return (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
           {[
@@ -653,9 +658,9 @@ export default function Inspections() {
             <tbody>
               {inspections.filter(ins => {
                 if (!kpiFilter) return true
-                if (kpiFilter === 'passed') return (ins.status === 'passed' || ins.status === 'completed') && (!ins.failed || ins.failed === 0)
-                if (kpiFilter === 'actions') return (ins.failed || 0) > 0
-                if (kpiFilter === 'failed') return ins.status === 'failed' || (ins.status === 'action-required' && (ins.score || 0) < 60)
+                if (kpiFilter === 'passed') return ins.status === 'passed' || ins.status === 'completed'
+                if (kpiFilter === 'actions') return ins.status === 'action-required'
+                if (kpiFilter === 'failed') return ins.status === 'failed'
                 return true
               }).map(ins => (
                 <tr key={ins.id}>
@@ -754,22 +759,46 @@ export default function Inspections() {
 
             {detailItems.length > 0 && (
               <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>Checklist Items</div>
-                <div style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 6 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>
+                  Checklist Items
+                  {detailInspection.status === 'action-required' && (
+                    <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--amber)', fontWeight: 600, textTransform: 'none' }}>— add corrective action notes on failed items below</span>
+                  )}
+                </div>
+                <div style={{ maxHeight: 300, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 6 }}>
                   {(() => {
                     const cats = [...new Set(detailItems.map(i => i.category))]
                     return cats.map(cat => (
                       <div key={cat}>
                         <div style={{ padding: '6px 10px', background: 'var(--surface-2)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-3)', borderBottom: '1px solid var(--border)' }}>{cat}</div>
                         {detailItems.filter(i => i.category === cat).map(item => (
-                          <div key={item.id} style={{ padding: '8px 10px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8, alignItems: 'flex-start', background: item.result === 'fail' ? 'rgba(220,38,38,0.04)' : 'transparent' }}>
-                            <span style={{ fontSize: 11, fontWeight: 700, minWidth: 36, color: item.result === 'pass' ? 'var(--green)' : item.result === 'fail' ? 'var(--red)' : item.result === 'na' ? 'var(--text-3)' : 'var(--amber)' }}>
-                              {item.result === 'pass' ? 'PASS' : item.result === 'fail' ? 'FAIL' : item.result === 'na' ? 'N/A' : 'PEND'}
-                            </span>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 12, fontWeight: 500 }}>{item.label}</div>
-                              {item.note && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2, fontStyle: 'italic' }}>{item.note}</div>}
+                          <div key={item.id} style={{ padding: '8px 10px', borderBottom: '1px solid var(--border)', background: item.result === 'fail' ? 'rgba(220,38,38,0.04)' : 'transparent' }}>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, minWidth: 36, color: item.result === 'pass' ? 'var(--green)' : item.result === 'fail' ? 'var(--red)' : item.result === 'na' ? 'var(--text-3)' : 'var(--amber)' }}>
+                                {item.result === 'pass' ? 'PASS' : item.result === 'fail' ? 'FAIL' : item.result === 'na' ? 'N/A' : 'PEND'}
+                              </span>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 12, fontWeight: 500 }}>{item.label}</div>
+                                {item.result !== 'fail' && item.note && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2, fontStyle: 'italic' }}>{item.note}</div>}
+                              </div>
                             </div>
+                            {item.result === 'fail' && (
+                              <div style={{ marginTop: 6, display: 'flex', gap: 6, alignItems: 'flex-start', paddingLeft: 44 }}>
+                                <textarea
+                                  style={{ flex: 1, fontSize: 11, padding: '5px 8px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-1)', resize: 'vertical', minHeight: 44, fontFamily: 'inherit' }}
+                                  placeholder="Corrective action taken / deficiency note…"
+                                  value={detailItemNotes[item.id] !== undefined ? detailItemNotes[item.id] : (item.note || '')}
+                                  onChange={e => setDetailItemNotes(prev => ({ ...prev, [item.id]: e.target.value }))}
+                                />
+                                <button
+                                  className="btn btn-ghost"
+                                  style={{ padding: '4px 10px', fontSize: 10, flexShrink: 0 }}
+                                  onClick={() => saveDetailItemNote(item.id)}
+                                >
+                                  Save
+                                </button>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>

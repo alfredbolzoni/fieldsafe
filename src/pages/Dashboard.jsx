@@ -18,11 +18,17 @@ import AIFloatingChat from '../AIFloatingChat'
 export default function Dashboard() {
   const [page, setPage] = useState('dashboard')
   const [userEmail, setUserEmail] = useState('')
+  const [liveTime, setLiveTime] = useState(new Date())
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) setUserEmail(user.email)
     })
+  }, [])
+
+  useEffect(() => {
+    const id = setInterval(() => setLiveTime(new Date()), 60000)
+    return () => clearInterval(id)
   }, [])
 
   async function handleLogout() {
@@ -108,8 +114,18 @@ export default function Dashboard() {
             <span className="breadcrumb-current">{page.charAt(0).toUpperCase() + page.slice(1)}</span>
           </div>
           <div className="topbar-right">
-            <span className="topbar-date">{new Date().toLocaleDateString('en-CA', { weekday:'short', month:'short', day:'numeric', year:'numeric' })}</span>
-            <button className="btn btn-primary" onClick={() => setPage('incidents')}>+ Log Incident</button>
+            <div className="db2-status-bar">
+              <span className="db2-pulse-dot" />
+              <span className="db2-status-text">All Systems Active</span>
+              <span className="db2-status-sep">|</span>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0 }}>
+                <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.2"/>
+                <path d="M6 3v3l2 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
+              <span className="db2-status-text">{liveTime.toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' })}</span>
+              <span className="db2-status-sep">|</span>
+              <span className="db2-status-compliant">✓ NS OHS Compliant</span>
+            </div>
           </div>
         </div>
 
@@ -153,11 +169,13 @@ function DashboardHome({ setPage }) {
     recentIncidents: [],
   })
   const [loading, setLoading] = useState(true)
-  const now = new Date()
-  const timeStr = now.toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' })
-  const dateStr = now.toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' })
+  const [clock, setClock] = useState(new Date())
 
   useEffect(() => { fetchAll() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const id = setInterval(() => setClock(new Date()), 60000)
+    return () => clearInterval(id)
+  }, [])
 
   async function fetchAll() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -294,17 +312,32 @@ function DashboardHome({ setPage }) {
     <div className="page-wrap dashboard-v2">
 
       {/* 1. HEADER */}
-      <div className="dv2-header">
-        <div>
-          <div className="dv2-date">{dateStr} · {timeStr}</div>
-          <h1 className="dv2-title">Site Overview</h1>
-          <p className="dv2-sub">FieldSafe HSE Platform · Nova Scotia · NS OHS Act Compliant</p>
-        </div>
-        <div className="dv2-header-actions">
-          <button className="btn btn-secondary" onClick={() => setPage('inspections')}>Start Inspection</button>
-          <button className="btn btn-primary" onClick={() => setPage('incidents')}>+ Log Incident</button>
-        </div>
-      </div>
+      {(() => {
+        const h = clock.getHours()
+        const greeting = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'
+        const timeStr = clock.toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' })
+        const dateStr = clock.toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase()
+        return (
+          <div className="dv2-header">
+            <div className="db2-hero-left">
+              <div className="db2-hero-date">{dateStr}</div>
+              <div className="db2-hero-time">{timeStr}</div>
+              <div className="db2-hero-greeting">{greeting}, HSE Manager</div>
+            </div>
+            <div className="db2-hero-right">
+              <div>
+                <span className="db2-site-badge">● SITE ACTIVE</span>
+                <div className="db2-hero-platform">FieldSafe HSE Platform · Nova Scotia</div>
+                <div className="db2-hero-ohs" onClick={() => setPage('resources')}>NS OHS Act Compliant ↗</div>
+              </div>
+              <div className="dv2-header-actions">
+                <button className="btn btn-secondary" onClick={() => setPage('inspections')}>Start Inspection</button>
+                <button className="btn btn-primary" onClick={() => setPage('incidents')}>+ Log Incident</button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* 2. KPI CARDS */}
       <div className="dv2-kpi-grid">

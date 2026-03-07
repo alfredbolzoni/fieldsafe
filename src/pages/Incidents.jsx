@@ -22,6 +22,7 @@ export default function Incidents() {
   const [tab, setTab] = useState('open')
   const [submitting, setSubmitting] = useState(false)
   const [detailIncident, setDetailIncident] = useState(null)
+  const [actionsFilter, setActionsFilter] = useState(null) // null | 'open' | 'overdue'
 
   // Workflow state
   const [activePhase, setActivePhase] = useState({})   // { incId: 0|1|2|3 }
@@ -265,6 +266,8 @@ export default function Incidents() {
     ? incidents.filter(i => i.status === 'open')
     : tab === 'closed'
     ? incidents.filter(i => i.status === 'closed')
+    : tab === 'high'
+    ? incidents.filter(i => i.severity === 'High' || i.severity === 'Critical')
     : incidents
 
   const overdueActions = actions.filter(a => a.status !== 'closed' && isOverdue(a.due_date))
@@ -304,12 +307,12 @@ export default function Incidents() {
       {/* KPI ROW */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
         {[
-          { label: 'Open Incidents', value: incidents.filter(i => i.status === 'open').length, color: incidents.filter(i => i.status === 'open').length > 0 ? 'var(--red)' : 'var(--green)', delta: `${incidents.filter(i => i.status === 'closed').length} closed`, toTab: 'open' },
-          { label: 'Open Actions', value: openActions.length, color: openActions.length > 0 ? 'var(--amber)' : 'var(--green)', delta: `${actions.filter(a => a.status === 'closed').length} completed`, toTab: 'actions' },
-          { label: 'Overdue Actions', value: overdueActions.length, color: overdueActions.length > 0 ? 'var(--red)' : 'var(--green)', delta: overdueActions.length > 0 ? 'Immediate attention' : 'All on track', toTab: 'actions' },
-          { label: 'High Severity', value: incidents.filter(i => i.severity === 'High' || i.severity === 'Critical').length, color: 'var(--orange)', delta: 'High + Critical', toTab: 'all' },
+          { label: 'Open Incidents', value: incidents.filter(i => i.status === 'open').length, color: incidents.filter(i => i.status === 'open').length > 0 ? 'var(--red)' : 'var(--green)', delta: `${incidents.filter(i => i.status === 'closed').length} closed`, onClick: () => setTab('open') },
+          { label: 'Open Actions', value: openActions.length, color: openActions.length > 0 ? 'var(--amber)' : 'var(--green)', delta: `${actions.filter(a => a.status === 'closed').length} completed`, onClick: () => { setTab('actions'); setActionsFilter('open') } },
+          { label: 'Overdue Actions', value: overdueActions.length, color: overdueActions.length > 0 ? 'var(--red)' : 'var(--green)', delta: overdueActions.length > 0 ? 'Immediate attention' : 'All on track', onClick: () => { setTab('actions'); setActionsFilter('overdue') } },
+          { label: 'High Severity', value: incidents.filter(i => i.severity === 'High' || i.severity === 'Critical').length, color: 'var(--orange)', delta: 'High + Critical', onClick: () => setTab('high') },
         ].map((k, i) => (
-          <div key={i} className="kpi-card" style={{ borderLeft: `3px solid ${k.color}`, cursor: 'pointer' }} onClick={() => setTab(k.toTab)}>
+          <div key={i} className="kpi-card" style={{ borderLeft: `3px solid ${k.color}`, cursor: 'pointer' }} onClick={k.onClick}>
             <div className="kpi-label">{k.label}</div>
             <div className="kpi-value" style={{ color: k.color, fontSize: 28 }}>{k.value}</div>
             <div className="kpi-delta">{k.delta}</div>
@@ -322,23 +325,33 @@ export default function Incidents() {
         {[
           { id: 'open',    label: `Open (${incidents.filter(i=>i.status==='open').length})` },
           { id: 'closed',  label: `Closed (${incidents.filter(i=>i.status==='closed').length})` },
+          { id: 'high',    label: `High/Critical (${incidents.filter(i=>i.severity==='High'||i.severity==='Critical').length})` },
           { id: 'all',     label: `All (${incidents.length})` },
           { id: 'actions', label: `Actions (${actions.length})` },
         ].map(t => (
-          <button key={t.id} className={`tab-btn ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>
+          <button key={t.id} className={`tab-btn ${tab === t.id ? 'active' : ''}`} onClick={() => { setTab(t.id); if (t.id !== 'actions') setActionsFilter(null) }}>{t.label}</button>
         ))}
       </div>
 
       {/* INCIDENTS TABLE */}
       <div className="table-wrap" style={{ marginBottom: 0 }}>
         {tab === 'actions' ? (
-          actions.length === 0 ? (
+          (() => {
+            const displayedActions = actionsFilter === 'open' ? openActions : actionsFilter === 'overdue' ? overdueActions : actions
+            return displayedActions.length === 0 ? (
             <div className="empty-state">
               <div className="empty-icon">✓</div>
               <div className="empty-title">No corrective actions</div>
               <div className="empty-sub">Add actions from within an incident's workflow</div>
             </div>
           ) : (
+            <>
+            {actionsFilter && (
+              <div style={{ padding: '8px 16px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)', fontSize: 12, color: 'var(--text-2)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span>Showing: <b>{actionsFilter === 'open' ? `Open actions (${openActions.length})` : `Overdue actions (${overdueActions.length})`}</b></span>
+                <button className="btn btn-ghost" style={{ padding: '2px 8px', fontSize: 11 }} onClick={() => setActionsFilter(null)}>Show all ✕</button>
+              </div>
+            )}
             <table className="fs-table">
               <thead>
                 <tr>
@@ -352,7 +365,7 @@ export default function Incidents() {
                 </tr>
               </thead>
               <tbody>
-                {actions.map(action => {
+                {displayedActions.map(action => {
                   const linkedInc = incidents.find(i => i.id === action.incident_id)
                   const overdue = action.status !== 'closed' && isOverdue(action.due_date)
                   return (
@@ -397,7 +410,9 @@ export default function Incidents() {
                 })}
               </tbody>
             </table>
+            </>
           )
+          })()
         ) : filteredIncidents.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">✓</div>

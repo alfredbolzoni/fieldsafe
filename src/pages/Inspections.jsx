@@ -531,14 +531,12 @@ export default function Inspections() {
         const kpiInProgress = inspections.filter(i => i.status === 'in-progress' || i.status === 'in_progress').length
         const kpiPassed = inspections.filter(i =>
           (i.status === 'completed' || i.status === 'passed') &&
-          (i.score || 0) >= 80 &&
           (!i.failed || i.failed === 0)
         ).length
-        const kpiActions = inspections.filter(i => i.failed > 0).length
+        const kpiActions = inspections.filter(i => (i.failed || 0) > 0).length
         const kpiFailed = inspections.filter(i =>
-          (i.status === 'completed' || i.status === 'failed') &&
-          (i.score || 0) < 60 &&
-          (i.score || 0) > 0
+          i.status === 'failed' ||
+          (i.status === 'action-required' && (i.score || 0) < 60)
         ).length
         return (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
@@ -655,9 +653,9 @@ export default function Inspections() {
             <tbody>
               {inspections.filter(ins => {
                 if (!kpiFilter) return true
-                if (kpiFilter === 'passed') return (ins.status === 'passed' || ins.status === 'completed') && (ins.failed || 0) === 0
-                if (kpiFilter === 'actions') return ins.status === 'action-required'
-                if (kpiFilter === 'failed') return ins.status === 'failed' || ((ins.score || 0) < 60 && ins.failed > 0)
+                if (kpiFilter === 'passed') return (ins.status === 'passed' || ins.status === 'completed') && (!ins.failed || ins.failed === 0)
+                if (kpiFilter === 'actions') return (ins.failed || 0) > 0
+                if (kpiFilter === 'failed') return ins.status === 'failed' || (ins.status === 'action-required' && (ins.score || 0) < 60)
                 return true
               }).map(ins => (
                 <tr key={ins.id}>

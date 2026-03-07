@@ -201,6 +201,63 @@ export default function Incidents() {
     return { class: 'General Incident', notificationRequired: false, deadline: 'Internal record only' }
   }
 
+  function handlePrintIncident(inc) {
+    const incActions = getActionsForIncident(inc.id)
+    const w = window.open('', '_blank', 'width=820,height=700')
+    w.document.write(`<!DOCTYPE html><html><head><title>Incident Report — ${inc.date}</title>
+    <style>
+      body{font-family:Arial,sans-serif;padding:40px;color:#111;font-size:14px}
+      h1{font-size:22px;margin:0 0 4px}
+      .meta{color:#666;font-size:13px;margin-bottom:28px}
+      h2{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#555;border-bottom:1px solid #ddd;padding-bottom:5px;margin:24px 0 12px}
+      .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;margin-bottom:8px}
+      .label{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}
+      .value{font-size:14px;font-weight:600}
+      .desc{background:#f5f5f5;padding:14px;border-radius:6px;line-height:1.6;white-space:pre-wrap}
+      table{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px}
+      th{text-align:left;padding:6px 8px;background:#f0f0f0;font-size:11px}
+      td{padding:7px 8px;border-bottom:1px solid #eee}
+      .warn{background:#fff8e1;border-left:3px solid #f59e0b;padding:10px 14px;border-radius:4px;font-size:12px;margin-bottom:12px}
+      .footer{margin-top:40px;padding-top:14px;border-top:1px solid #ddd;font-size:11px;color:#aaa;text-align:center}
+      @media print{body{padding:20px}}
+    </style></head><body>
+    <h1>Incident Report</h1>
+    <div class="meta">${inc.type} &middot; ${inc.severity} severity &middot; Reported ${inc.date} &middot; Status: ${inc.status}</div>
+    <h2>Incident Details</h2>
+    <div class="grid">
+      <div><div class="label">Date</div><div class="value">${inc.date}</div></div>
+      <div><div class="label">Location</div><div class="value">${inc.location}</div></div>
+      <div><div class="label">Reported By</div><div class="value">${inc.reported_by}</div></div>
+      ${inc.ns_ohs_class ? `<div><div class="label">NS OHS Classification</div><div class="value">${inc.ns_ohs_class}</div></div>` : ''}
+    </div>
+    ${inc.notification_required ? `<div class="warn">⚠ Regulatory notification required: ${inc.notification_deadline}</div>` : ''}
+    <h2>Description</h2>
+    <div class="desc">${inc.description}</div>
+    ${inc.root_cause ? `
+    <h2>Investigation</h2>
+    <div class="grid">
+      <div style="grid-column:1/-1"><div class="label">Root Cause</div><div class="value" style="font-weight:400;margin-top:4px">${inc.root_cause}</div></div>
+      ${inc.contributing_factors ? `<div style="grid-column:1/-1"><div class="label">Contributing Factors</div><div class="value" style="font-weight:400;margin-top:4px">${inc.contributing_factors}</div></div>` : ''}
+      ${inc.witnesses ? `<div><div class="label">Witnesses</div><div class="value">${inc.witnesses}</div></div>` : ''}
+      ${inc.investigation_notes ? `<div style="grid-column:1/-1"><div class="label">Investigation Notes</div><div class="value" style="font-weight:400;margin-top:4px">${inc.investigation_notes}</div></div>` : ''}
+    </div>` : ''}
+    ${incActions.length > 0 ? `
+    <h2>Corrective Actions (${incActions.length})</h2>
+    <table><thead><tr><th>Description</th><th>Assigned To</th><th>Due Date</th><th>Priority</th><th>Status</th></tr></thead><tbody>
+      ${incActions.map(a => `<tr><td>${a.description}</td><td>${a.assigned_to}</td><td>${a.due_date}</td><td>${a.priority}</td><td>${a.status}</td></tr>`).join('')}
+    </tbody></table>` : ''}
+    ${inc.hse_signed_by ? `
+    <h2>Formal Closure</h2>
+    <div class="grid">
+      <div><div class="label">Signed By</div><div class="value">${inc.hse_signed_by}</div></div>
+      <div><div class="label">Closure Date</div><div class="value">${inc.hse_signed_date}</div></div>
+    </div>` : ''}
+    <div class="footer">FieldSafe HSE Management System &middot; Generated ${new Date().toLocaleDateString()}</div>
+    <script>window.onload=function(){window.print()}</script>
+    </body></html>`)
+    w.document.close()
+  }
+
   const sevPill = { Low: 'pill-green', Medium: 'pill-amber', High: 'pill-orange', Critical: 'pill-red' }
   const priorityPill = { Low: 'pill-green', Medium: 'pill-amber', High: 'pill-orange', Critical: 'pill-red' }
 
@@ -248,8 +305,8 @@ export default function Incidents() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
         {[
           { label: 'Open Incidents', value: incidents.filter(i => i.status === 'open').length, color: incidents.filter(i => i.status === 'open').length > 0 ? 'var(--red)' : 'var(--green)', delta: `${incidents.filter(i => i.status === 'closed').length} closed`, toTab: 'open' },
-          { label: 'Open Actions', value: openActions.length, color: openActions.length > 0 ? 'var(--amber)' : 'var(--green)', delta: `${actions.filter(a => a.status === 'closed').length} completed`, toTab: 'open' },
-          { label: 'Overdue Actions', value: overdueActions.length, color: overdueActions.length > 0 ? 'var(--red)' : 'var(--green)', delta: overdueActions.length > 0 ? 'Immediate attention' : 'All on track', toTab: 'open' },
+          { label: 'Open Actions', value: openActions.length, color: openActions.length > 0 ? 'var(--amber)' : 'var(--green)', delta: `${actions.filter(a => a.status === 'closed').length} completed`, toTab: 'actions' },
+          { label: 'Overdue Actions', value: overdueActions.length, color: overdueActions.length > 0 ? 'var(--red)' : 'var(--green)', delta: overdueActions.length > 0 ? 'Immediate attention' : 'All on track', toTab: 'actions' },
           { label: 'High Severity', value: incidents.filter(i => i.severity === 'High' || i.severity === 'Critical').length, color: 'var(--orange)', delta: 'High + Critical', toTab: 'all' },
         ].map((k, i) => (
           <div key={i} className="kpi-card" style={{ borderLeft: `3px solid ${k.color}`, cursor: 'pointer' }} onClick={() => setTab(k.toTab)}>
@@ -263,9 +320,10 @@ export default function Incidents() {
       {/* TABS */}
       <div className="tabs">
         {[
-          { id: 'open',   label: `Open (${incidents.filter(i=>i.status==='open').length})` },
-          { id: 'closed', label: `Closed (${incidents.filter(i=>i.status==='closed').length})` },
-          { id: 'all',    label: `All (${incidents.length})` },
+          { id: 'open',    label: `Open (${incidents.filter(i=>i.status==='open').length})` },
+          { id: 'closed',  label: `Closed (${incidents.filter(i=>i.status==='closed').length})` },
+          { id: 'all',     label: `All (${incidents.length})` },
+          { id: 'actions', label: `Actions (${actions.length})` },
         ].map(t => (
           <button key={t.id} className={`tab-btn ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>
         ))}
@@ -273,7 +331,74 @@ export default function Incidents() {
 
       {/* INCIDENTS TABLE */}
       <div className="table-wrap" style={{ marginBottom: 0 }}>
-        {filteredIncidents.length === 0 ? (
+        {tab === 'actions' ? (
+          actions.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">✓</div>
+              <div className="empty-title">No corrective actions</div>
+              <div className="empty-sub">Add actions from within an incident's workflow</div>
+            </div>
+          ) : (
+            <table className="fs-table">
+              <thead>
+                <tr>
+                  <th>Description</th>
+                  <th>Linked Incident</th>
+                  <th>Assigned To</th>
+                  <th>Due Date</th>
+                  <th>Priority</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {actions.map(action => {
+                  const linkedInc = incidents.find(i => i.id === action.incident_id)
+                  const overdue = action.status !== 'closed' && isOverdue(action.due_date)
+                  return (
+                    <tr key={action.id} style={{ background: overdue ? 'rgba(255,59,48,0.04)' : undefined }}>
+                      <td style={{ maxWidth: 280 }}>
+                        <div style={{ fontWeight: 600, fontSize: 12 }}>{action.description}</div>
+                        {action.notes && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>{action.notes}</div>}
+                      </td>
+                      <td style={{ fontSize: 11, color: 'var(--text-2)', maxWidth: 180 }}>
+                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {linkedInc ? `${linkedInc.date} — ${linkedInc.description.slice(0,40)}` : '—'}
+                        </div>
+                      </td>
+                      <td style={{ fontWeight: 600, fontSize: 12 }}>{action.assigned_to}</td>
+                      <td>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: overdue ? 'var(--red)' : 'var(--text-1)' }}>{action.due_date}</div>
+                        <div style={{ fontSize: 10, color: overdue ? 'var(--red)' : 'var(--text-3)', fontWeight: overdue ? 700 : 400 }}>{daysUntil(action.due_date)}</div>
+                      </td>
+                      <td><span className={`pill ${priorityPill[action.priority] || 'pill-gray'}`}>{action.priority}</span></td>
+                      <td>
+                        {action.status === 'closed'
+                          ? <span className="pill pill-green">Closed</span>
+                          : overdue
+                          ? <span className="pill pill-red">Overdue</span>
+                          : action.status === 'in-progress'
+                          ? <span className="pill pill-blue">In Progress</span>
+                          : <span className="pill pill-amber">Open</span>
+                        }
+                      </td>
+                      <td>
+                        {action.status !== 'closed' && (
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            {action.status === 'open' && (
+                              <button className="btn btn-ghost" style={{ padding: '3px 9px', fontSize: 11 }} onClick={() => handleUpdateActionStatus(action.id, 'in-progress')}>Start</button>
+                            )}
+                            <button className="btn btn-secondary" style={{ padding: '3px 9px', fontSize: 11 }} onClick={() => handleCloseAction(action.id)}>✓ Done</button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )
+        ) : filteredIncidents.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">✓</div>
             <div className="empty-title">No {tab === 'open' ? 'open ' : ''}incidents</div>
@@ -915,7 +1040,8 @@ export default function Incidents() {
               </div>
             )}
 
-            <div className="modal-footer" style={{ paddingTop: 12 }}>
+            <div className="modal-footer" style={{ paddingTop: 12, justifyContent: 'space-between' }}>
+              <button className="btn btn-primary" onClick={() => handlePrintIncident(detailIncident)}>Print / Export PDF</button>
               <button className="btn btn-secondary" onClick={() => setDetailIncident(null)}>Close</button>
             </div>
           </div>

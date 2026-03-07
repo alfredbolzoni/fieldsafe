@@ -65,6 +65,8 @@ export default function Inspections() {
   const [saving, setSaving] = useState(false)
   const [noteInputs, setNoteInputs] = useState({})   // { itemId: string }
   const [detailInspection, setDetailInspection] = useState(null)
+  const [detailItems, setDetailItems] = useState([])
+  const [kpiFilter, setKpiFilter] = useState(null)
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
     supervisor: '',
@@ -135,6 +137,83 @@ export default function Inspections() {
   async function closeInspection(id) {
     await supabase.from('inspections').update({ status: 'completed' }).eq('id', id)
     fetchInspections()
+  }
+
+  async function openDetailModal(ins) {
+    setDetailInspection(ins)
+    setDetailItems([])
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data } = await supabase
+      .from('inspection_items')
+      .select('*')
+      .eq('inspection_id', ins.id)
+      .eq('user_id', user.id)
+      .order('category')
+    setDetailItems(data || [])
+  }
+
+  function handlePrintInspection(ins, insItems) {
+    const passed  = insItems.filter(i => i.result === 'pass').length
+    const failed  = insItems.filter(i => i.result === 'fail').length
+    const failedItems = insItems.filter(i => i.result === 'fail')
+    const w = window.open('', '_blank', 'width=820,height=700')
+    w.document.write(`<!DOCTYPE html><html><head><title>Inspection Report — ${ins.date}</title>
+    <style>
+      body{font-family:Arial,sans-serif;padding:40px;color:#111;font-size:14px}
+      h1{font-size:22px;margin:0 0 4px}
+      .meta{color:#666;font-size:13px;margin-bottom:28px}
+      h2{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#555;border-bottom:1px solid #ddd;padding-bottom:5px;margin:24px 0 12px}
+      .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 24px}
+      .label{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}
+      .value{font-size:14px;font-weight:600}
+      .score-box{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:16px;background:#f5f5f5;border-radius:8px;text-align:center;margin-bottom:8px}
+      .score-num{font-size:32px;font-weight:800}
+      .score-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#888;margin-top:2px}
+      table{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px}
+      th{text-align:left;padding:6px 8px;background:#f0f0f0;font-size:11px}
+      td{padding:7px 8px;border-bottom:1px solid #eee;vertical-align:top}
+      .item-fail{background:#fff5f5;border-left:3px solid #dc2626}
+      .note{font-size:11px;color:#888;font-style:italic;margin-top:3px}
+      .footer{margin-top:40px;padding-top:14px;border-top:1px solid #ddd;font-size:11px;color:#aaa;text-align:center}
+      @media print{body{padding:20px}}
+    </style></head><body>
+    <h1>Site Inspection Report</h1>
+    <div class="meta">${typeLabel(ins.inspection_type)} &middot; ${ins.date} &middot; ${ins.location} &middot; Supervisor: ${ins.supervisor}</div>
+    <h2>Summary</h2>
+    <div class="score-box">
+      <div><div class="score-num" style="color:${(ins.score||0)>=80?'#16a34a':(ins.score||0)>=60?'#d97706':'#dc2626'}">${ins.score||0}%</div><div class="score-lbl">Score</div></div>
+      <div><div class="score-num" style="color:#16a34a">${ins.passed||0}</div><div class="score-lbl">Passed</div></div>
+      <div><div class="score-num" style="color:${(ins.failed||0)>0?'#dc2626':'#9ca3af'}">${ins.failed||0}</div><div class="score-lbl">Failed</div></div>
+    </div>
+    <div class="grid" style="margin-top:12px">
+      <div><div class="label">Inspector</div><div class="value">${ins.supervisor}</div></div>
+      <div><div class="label">Location</div><div class="value">${ins.location}</div></div>
+      <div><div class="label">Date</div><div class="value">${ins.date}</div></div>
+      <div><div class="label">Status</div><div class="value">${ins.status}</div></div>
+    </div>
+    ${failedItems.length > 0 ? `
+    <h2>Failed Items (${failedItems.length})</h2>
+    <table><thead><tr><th>Category</th><th>Item</th><th>Note / Deficiency</th></tr></thead><tbody>
+      ${failedItems.map(it => `<tr class="item-fail">
+        <td style="font-size:11px;color:#666">${it.category||''}</td>
+        <td><b>${it.label}</b>${it.sub?`<div class="note">${it.sub}</div>`:''}</td>
+        <td class="note">${it.note||'—'}</td>
+      </tr>`).join('')}
+    </tbody></table>` : ''}
+    ${insItems.length > 0 ? `
+    <h2>Full Checklist (${insItems.length} items)</h2>
+    <table><thead><tr><th>Category</th><th>Item</th><th>Result</th><th>Note</th></tr></thead><tbody>
+      ${insItems.map(it => `<tr style="${it.result==='fail'?'background:#fff5f5':it.result==='pass'?'background:#f0fff4':''}">
+        <td style="font-size:11px;color:#666">${it.category||''}</td>
+        <td>${it.label}</td>
+        <td style="font-weight:700;color:${it.result==='pass'?'#16a34a':it.result==='fail'?'#dc2626':'#9ca3af'}">${it.result==='pass'?'PASS':it.result==='fail'?'FAIL':it.result==='na'?'N/A':'PENDING'}</td>
+        <td class="note">${it.note||''}</td>
+      </tr>`).join('')}
+    </tbody></table>` : '<p style="color:#888;font-style:italic">No checklist items on record for this inspection.</p>'}
+    <div class="footer">FieldSafe HSE Management System &middot; Generated ${new Date().toLocaleDateString()}</div>
+    <script>window.onload=function(){window.print()}</script>
+    </body></html>`)
+    w.document.close()
   }
 
   async function setResult(itemId, result) {
@@ -464,17 +543,26 @@ export default function Inspections() {
         return (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
           {[
-            { label: 'Total Inspections', value: inspections.length, color: 'var(--primary)', delta: `${kpiInProgress} in progress` },
-            { label: 'Passed', value: kpiPassed, color: 'var(--green)', delta: 'Score ≥ 80% · no fails' },
-            { label: 'Actions Required', value: kpiActions, color: 'var(--amber)', delta: 'Failed items present' },
-            { label: 'Failed', value: kpiFailed, color: 'var(--red)', delta: 'Score < 60%' },
-          ].map((k, i) => (
-            <div key={i} className="kpi-card" style={{ borderLeft: `3px solid ${k.color}` }}>
-              <div className="kpi-label">{k.label}</div>
-              <div className="kpi-value" style={{ color: k.color, fontSize: 28 }}>{k.value}</div>
-              <div className="kpi-delta">{k.delta}</div>
-            </div>
-          ))}
+            { label: 'Total Inspections', value: inspections.length, color: 'var(--primary)', delta: `${kpiInProgress} in progress`, filter: null },
+            { label: 'Passed', value: kpiPassed, color: 'var(--green)', delta: 'Score ≥ 80% · no fails', filter: 'passed' },
+            { label: 'Actions Required', value: kpiActions, color: 'var(--amber)', delta: 'Failed items present', filter: 'actions' },
+            { label: 'Failed', value: kpiFailed, color: 'var(--red)', delta: 'Score < 60%', filter: 'failed' },
+          ].map((k, i) => {
+            const active = kpiFilter === k.filter
+            return (
+              <div
+                key={i}
+                className="kpi-card"
+                style={{ borderLeft: `3px solid ${k.color}`, cursor: 'pointer', outline: active ? `2px solid ${k.color}` : 'none', outlineOffset: 2 }}
+                onClick={() => setKpiFilter(active ? null : k.filter)}
+                title={active ? 'Click to clear filter' : 'Click to filter'}
+              >
+                <div className="kpi-label">{k.label}{active ? ' ✕' : ''}</div>
+                <div className="kpi-value" style={{ color: k.color, fontSize: 28 }}>{k.value}</div>
+                <div className="kpi-delta">{k.delta}</div>
+              </div>
+            )
+          })}
         </div>
         )
       })()}
@@ -543,6 +631,13 @@ export default function Inspections() {
             <div className="empty-sub">Click "+ Start Inspection" to begin your first NS OHS compliant site checklist</div>
           </div>
         ) : (
+          <>
+          {kpiFilter && (
+            <div style={{ padding: '8px 16px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)', fontSize: 12, color: 'var(--text-2)', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span>Filtering by: <b>{kpiFilter === 'passed' ? 'Passed (score ≥80%, no fails)' : kpiFilter === 'actions' ? 'Actions Required (failed items)' : 'Failed (score <60%)'}</b></span>
+              <button className="btn btn-ghost" style={{ padding: '2px 8px', fontSize: 11 }} onClick={() => setKpiFilter(null)}>Clear ✕</button>
+            </div>
+          )}
           <table className="fs-table">
             <thead>
               <tr>
@@ -558,7 +653,13 @@ export default function Inspections() {
               </tr>
             </thead>
             <tbody>
-              {inspections.map(ins => (
+              {inspections.filter(ins => {
+                if (!kpiFilter) return true
+                if (kpiFilter === 'passed') return (ins.status === 'passed' || ins.status === 'completed') && (ins.failed || 0) === 0
+                if (kpiFilter === 'actions') return ins.status === 'action-required'
+                if (kpiFilter === 'failed') return ins.status === 'failed' || ((ins.score || 0) < 60 && ins.failed > 0)
+                return true
+              }).map(ins => (
                 <tr key={ins.id}>
                   <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>{ins.date}</td>
                   <td><span style={{ fontSize: 11, color: 'var(--text-2)' }}>{typeLabel(ins.inspection_type)}</span></td>
@@ -578,7 +679,7 @@ export default function Inspections() {
                     )}
                     {(ins.status === 'action-required' || ins.status === 'failed') && (
                       <div style={{ display: 'flex', gap: 4 }}>
-                        <button className="btn btn-ghost" style={{ padding: '3px 10px', fontSize: 11 }} onClick={() => setDetailInspection(ins)}>
+                        <button className="btn btn-ghost" style={{ padding: '3px 10px', fontSize: 11 }} onClick={() => openDetailModal(ins)}>
                           View →
                         </button>
                         <button className="btn btn-ghost" style={{ padding: '3px 10px', fontSize: 11 }} onClick={() => closeInspection(ins.id)}>
@@ -587,7 +688,7 @@ export default function Inspections() {
                       </div>
                     )}
                     {(ins.status === 'completed' || ins.status === 'passed') && (
-                      <button className="btn btn-ghost" style={{ padding: '3px 10px', fontSize: 11 }} onClick={() => setDetailInspection(ins)}>
+                      <button className="btn btn-ghost" style={{ padding: '3px 10px', fontSize: 11 }} onClick={() => openDetailModal(ins)}>
                         View →
                       </button>
                     )}
@@ -596,6 +697,7 @@ export default function Inspections() {
               ))}
             </tbody>
           </table>
+          </>
         )}
       </div>
 
@@ -652,12 +754,47 @@ export default function Inspections() {
               </div>
             )}
 
+            {detailItems.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>Checklist Items</div>
+                <div style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 6 }}>
+                  {(() => {
+                    const cats = [...new Set(detailItems.map(i => i.category))]
+                    return cats.map(cat => (
+                      <div key={cat}>
+                        <div style={{ padding: '6px 10px', background: 'var(--surface-2)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-3)', borderBottom: '1px solid var(--border)' }}>{cat}</div>
+                        {detailItems.filter(i => i.category === cat).map(item => (
+                          <div key={item.id} style={{ padding: '8px 10px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8, alignItems: 'flex-start', background: item.result === 'fail' ? 'rgba(220,38,38,0.04)' : 'transparent' }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, minWidth: 36, color: item.result === 'pass' ? 'var(--green)' : item.result === 'fail' ? 'var(--red)' : item.result === 'na' ? 'var(--text-3)' : 'var(--amber)' }}>
+                              {item.result === 'pass' ? 'PASS' : item.result === 'fail' ? 'FAIL' : item.result === 'na' ? 'N/A' : 'PEND'}
+                            </span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 12, fontWeight: 500 }}>{item.label}</div>
+                              {item.note && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2, fontStyle: 'italic' }}>{item.note}</div>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ))
+                  })()}
+                </div>
+              </div>
+            )}
+            {detailItems.length === 0 && (
+              <div style={{ fontSize: 12, color: 'var(--text-3)', fontStyle: 'italic', marginBottom: 16 }}>Loading checklist items…</div>
+            )}
+
             <div className="modal-footer" style={{ paddingTop: 12, justifyContent: 'space-between' }}>
-              {(detailInspection.status === 'action-required' || detailInspection.status === 'failed') && (
-                <button className="btn btn-secondary" onClick={() => { closeInspection(detailInspection.id); setDetailInspection(null) }}>
-                  Mark as Closed
+              <div style={{ display: 'flex', gap: 8 }}>
+                {(detailInspection.status === 'action-required' || detailInspection.status === 'failed') && (
+                  <button className="btn btn-secondary" onClick={() => { closeInspection(detailInspection.id); setDetailInspection(null) }}>
+                    Mark as Closed
+                  </button>
+                )}
+                <button className="btn btn-primary" onClick={() => handlePrintInspection(detailInspection, detailItems)}>
+                  Print / Export PDF
                 </button>
-              )}
+              </div>
               <button className="btn btn-ghost" onClick={() => setDetailInspection(null)}>Close</button>
             </div>
           </div>

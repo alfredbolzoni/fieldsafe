@@ -326,8 +326,10 @@ function DashboardHome({ setPage }) {
             </div>
             <div className="db2-hero-right">
               <div>
-                <span className="db2-site-badge">● SITE ACTIVE</span>
-                <div className="db2-hero-platform">FieldSafe HSE Platform · Nova Scotia</div>
+                <div className="db2-hero-platform">
+                  FieldSafe HSE Platform · Nova Scotia
+                  <span className="db2-site-badge">● SITE ACTIVE</span>
+                </div>
                 <div className="db2-hero-ohs" onClick={() => setPage('resources')}>NS OHS Act Compliant ↗</div>
               </div>
               <div className="dv2-header-actions">

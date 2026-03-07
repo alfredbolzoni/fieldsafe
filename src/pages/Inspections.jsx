@@ -116,10 +116,12 @@ export default function Inspections() {
   }
 
   async function fetchInspection(id) {
+    const { data: { user } } = await supabase.auth.getUser()
     const { data } = await supabase
       .from('inspection_items')
       .select('*')
       .eq('inspection_id', id)
+      .eq('user_id', user.id)
     setItems(data || [])
   }
 
@@ -216,31 +218,47 @@ export default function Inspections() {
 
         {/* RECOVERY BANNER — inspection exists but has no items (e.g. created via seed/SQL) */}
         {items.length === 0 && (
-          <div className="alert alert-warn" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <div className="alert-title">No checklist items found for this inspection</div>
-              <div className="alert-body" style={{ marginTop: 2 }}>This inspection was created without items. Load the standard checklist to continue.</div>
+          <div className="alert alert-warn" style={{ marginBottom: 16 }}>
+            <div className="alert-title">⚠ This inspection has no checklist items loaded.</div>
+            <div className="alert-body" style={{ marginTop: 4 }}>
+              This can happen with inspections created outside the app.<br />
+              Click "Load Checklist" to generate the standard {CHECKLIST.length}-item checklist for this inspection.
             </div>
-            <button
-              className="btn btn-secondary"
-              style={{ flexShrink: 0, marginLeft: 16 }}
-              onClick={async () => {
-                const { data: { user } } = await supabase.auth.getUser()
-                const itemsToInsert = CHECKLIST.map(item => ({
-                  inspection_id: activeInspection.id,
-                  label: item.label,
-                  sub: item.sub,
-                  category: item.category,
-                  ref: item.ref,
-                  result: 'pending',
-                  user_id: user.id,
-                  note: '',
-                }))
-                await supabase.from('inspection_items').insert(itemsToInsert)
-                await fetchInspection(activeInspection.id)
-              }}>
-              Load Checklist →
-            </button>
+            <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+              <button
+                className="btn btn-primary"
+                onClick={async () => {
+                  setSaving(true)
+                  try {
+                    const { data: { user } } = await supabase.auth.getUser()
+                    const itemsToInsert = CHECKLIST.map(item => ({
+                      inspection_id: activeInspection.id,
+                      label: item.label,
+                      sub: item.sub,
+                      category: item.category,
+                      ref: item.ref,
+                      result: 'pending',
+                      user_id: user.id,
+                      note: '',
+                    }))
+                    const { error } = await supabase.from('inspection_items').insert(itemsToInsert)
+                    if (error) throw error
+                    await fetchInspection(activeInspection.id)
+                  } catch (err) {
+                    alert('Failed to load checklist: ' + (err.message || 'Unknown error'))
+                  } finally {
+                    setSaving(false)
+                  }
+                }}
+                disabled={saving}>
+                {saving ? 'Loading…' : 'Load Checklist'}
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={() => { setView('list'); fetchInspections() }}>
+                Cancel
+              </button>
+            </div>
           </div>
         )}
 

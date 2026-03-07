@@ -442,13 +442,26 @@ export default function Inspections() {
       </div>
 
       {/* KPI ROW */}
-      {inspections.length > 0 && (
+      {inspections.length > 0 && (() => {
+        const kpiInProgress = inspections.filter(i => i.status === 'in-progress' || i.status === 'in_progress').length
+        const kpiPassed = inspections.filter(i =>
+          (i.status === 'completed' || i.status === 'passed') &&
+          (i.score || 0) >= 80 &&
+          (!i.failed || i.failed === 0)
+        ).length
+        const kpiActions = inspections.filter(i => i.failed > 0).length
+        const kpiFailed = inspections.filter(i =>
+          (i.status === 'completed' || i.status === 'failed') &&
+          (i.score || 0) < 60 &&
+          (i.score || 0) > 0
+        ).length
+        return (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
           {[
-            { label: 'Total Inspections', value: inspections.length, color: 'var(--primary)', delta: `${inspections.filter(i => i.status === 'in-progress').length} in progress` },
-            { label: 'Passed', value: inspections.filter(i => i.status === 'passed').length, color: 'var(--green)', delta: 'Score ≥ 80% · no fails' },
-            { label: 'Actions Required', value: inspections.filter(i => i.status === 'action-required').length, color: 'var(--amber)', delta: 'Failed items present' },
-            { label: 'Failed', value: inspections.filter(i => i.status === 'failed').length, color: 'var(--red)', delta: 'Score < 60%' },
+            { label: 'Total Inspections', value: inspections.length, color: 'var(--primary)', delta: `${kpiInProgress} in progress` },
+            { label: 'Passed', value: kpiPassed, color: 'var(--green)', delta: 'Score ≥ 80% · no fails' },
+            { label: 'Actions Required', value: kpiActions, color: 'var(--amber)', delta: 'Failed items present' },
+            { label: 'Failed', value: kpiFailed, color: 'var(--red)', delta: 'Score < 60%' },
           ].map((k, i) => (
             <div key={i} className="kpi-card" style={{ borderLeft: `3px solid ${k.color}` }}>
               <div className="kpi-label">{k.label}</div>
@@ -457,7 +470,8 @@ export default function Inspections() {
             </div>
           ))}
         </div>
-      )}
+        )
+      })()}
 
       {/* NEW INSPECTION MODAL */}
       {view === 'new' && (

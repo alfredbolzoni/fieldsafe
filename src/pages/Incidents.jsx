@@ -202,61 +202,172 @@ export default function Incidents() {
     return { class: 'General Incident', notificationRequired: false, deadline: 'Internal record only' }
   }
 
+  function buildReportHTML(inc, incActions, exportMode = false) {
+    const closedAct = incActions.filter(a => a.status === 'closed')
+    const openAct   = incActions.filter(a => a.status !== 'closed')
+    const pill = p => p === 'Critical' ? 'pill-red' : p === 'High' ? 'pill-orange' : p === 'Medium' ? 'pill-amber' : 'pill-green'
+    return `<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"><title>Incident Report — ${inc.date}</title>
+    <style>
+      *{box-sizing:border-box}
+      body{font-family:Arial,sans-serif;padding:40px;color:#111;font-size:13px;max-width:860px;margin:0 auto}
+      h1{font-size:22px;margin:0 0 6px;color:#0f172a}
+      .subtitle{color:#555;font-size:12px;margin-bottom:0;padding-bottom:14px;border-bottom:2px solid #0f172a}
+      h2{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.9px;color:#64748b;border-bottom:1px solid #e2e8f0;padding-bottom:5px;margin:22px 0 10px}
+      .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px 28px}
+      .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px 20px}
+      .field{margin-bottom:4px}
+      .lbl{font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
+      .val{font-size:13px;font-weight:700;color:#0f172a}
+      .val-n{font-size:13px;font-weight:400;color:#1e293b;line-height:1.55;white-space:pre-wrap}
+      .desc{background:#f8fafc;border:1px solid #e2e8f0;padding:12px;border-radius:4px;line-height:1.6;white-space:pre-wrap;font-size:13px}
+      .warn{background:#fffbeb;border-left:3px solid #f59e0b;padding:10px 14px;font-size:12px;margin:10px 0;border-radius:0 4px 4px 0}
+      table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
+      th{text-align:left;padding:7px 10px;background:#f1f5f9;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#475569;border-bottom:2px solid #e2e8f0}
+      td{padding:8px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top}
+      .pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+      .pill-red{background:#fee2e2;color:#dc2626}
+      .pill-green{background:#dcfce7;color:#16a34a}
+      .pill-amber{background:#fef9c3;color:#a16207}
+      .pill-blue{background:#dbeafe;color:#1d4ed8}
+      .pill-orange{background:#ffedd5;color:#c2410c}
+      .timeline{border-left:2px solid #cbd5e1;padding-left:16px;margin:6px 0}
+      .tl{position:relative;margin-bottom:8px;font-size:12px;line-height:1.4}
+      .tl::before{content:'';width:8px;height:8px;border-radius:50%;background:#64748b;position:absolute;left:-20px;top:4px}
+      .tl.done::before{background:#16a34a}
+      .badge-ok{color:#16a34a;font-weight:700}
+      .badge-err{color:#dc2626;font-weight:700}
+      .section{page-break-inside:avoid;margin-bottom:4px}
+      .footer{margin-top:40px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:10px;color:#94a3b8;text-align:center}
+      .save-btn{display:block;width:100%;margin-bottom:20px;padding:12px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.3px}
+      @media print{.save-btn{display:none!important}body{padding:20px}}
+    </style></head><body>
+    ${exportMode ? `<button class="save-btn" onclick="window.print()">⬇ Salva come PDF — usa "Salva in PDF" nel dialogo di stampa</button>` : ''}
+    <h1>Incident Report</h1>
+    <div class="subtitle" style="display:flex;gap:16px;flex-wrap:wrap">
+      <span><b>Tipo:</b> ${inc.type}</span>
+      <span><b>Severità:</b> ${inc.severity}</span>
+      <span><b>Stato:</b> <span style="color:${inc.status==='closed'?'#16a34a':'#dc2626'};font-weight:700">${inc.status === 'closed' ? 'CHIUSO' : 'APERTO'}</span></span>
+      ${inc.ns_ohs_class ? `<span><b>NS OHS:</b> ${inc.ns_ohs_class}</span>` : ''}
+    </div>
+
+    <div class="section">
+      <h2>Dettagli incidente</h2>
+      <div class="grid3">
+        <div class="field"><div class="lbl">Data</div><div class="val">${inc.date}</div></div>
+        <div class="field"><div class="lbl">Luogo</div><div class="val">${inc.location}</div></div>
+        <div class="field"><div class="lbl">Segnalato da</div><div class="val">${inc.reported_by}</div></div>
+        ${inc.assignee ? `<div class="field"><div class="lbl">Responsabile caso</div><div class="val">${inc.assignee}</div></div>` : ''}
+        ${inc.assignee_date ? `<div class="field"><div class="lbl">Presa in carico</div><div class="val">${inc.assignee_date}</div></div>` : ''}
+        ${inc.ns_ohs_class ? `<div class="field"><div class="lbl">Classificazione</div><div class="val" style="color:${inc.notification_required?'#dc2626':'inherit'}">${inc.ns_ohs_class}</div></div>` : ''}
+      </div>
+    </div>
+
+    ${inc.notification_required ? `<div class="warn"><b>⚠ Notifica obbligatoria:</b> ${inc.notification_deadline}</div>` : ''}
+
+    <div class="section">
+      <h2>Descrizione</h2>
+      <div class="desc">${inc.description}</div>
+    </div>
+
+    ${(inc.root_cause || inc.contributing_factors || inc.witnesses || inc.investigation_notes) ? `
+    <div class="section">
+      <h2>Indagine — Analisi causa radice</h2>
+      ${inc.root_cause ? `<div class="field" style="margin-bottom:10px"><div class="lbl">Causa Radice</div><div class="val-n">${inc.root_cause}</div></div>` : ''}
+      ${inc.contributing_factors ? `<div class="field" style="margin-bottom:10px"><div class="lbl">Fattori Contribuenti</div><div class="val-n">${inc.contributing_factors}</div></div>` : ''}
+      ${inc.witnesses ? `<div class="field" style="margin-bottom:10px"><div class="lbl">Testimoni</div><div class="val">${inc.witnesses}</div></div>` : ''}
+      ${inc.investigation_notes ? `<div class="field"><div class="lbl">Note di Indagine</div><div class="val-n">${inc.investigation_notes}</div></div>` : ''}
+    </div>` : `<div class="section"><h2>Indagine</h2><p style="color:#94a3b8;font-style:italic;font-size:12px">Indagine non ancora completata.</p></div>`}
+
+    <div class="section">
+      <h2>Azioni correttive — ${incActions.length} totali · ${closedAct.length} completate · ${openAct.length} aperte</h2>
+      ${incActions.length === 0
+        ? `<p style="color:#94a3b8;font-style:italic;font-size:12px">Nessuna azione correttiva registrata.</p>`
+        : `<table>
+          <thead><tr><th>Descrizione</th><th>Assegnato a</th><th>Scadenza</th><th>Priorità</th><th>Stato</th><th>Chiusura</th></tr></thead>
+          <tbody>
+          ${incActions.map(a => `<tr>
+            <td><div style="font-weight:600;margin-bottom:2px">${a.description}</div>${a.notes ? `<div style="font-size:11px;color:#64748b">${a.notes}</div>` : ''}</td>
+            <td style="font-weight:600">${a.assigned_to}</td>
+            <td>${a.due_date}</td>
+            <td><span class="pill ${pill(a.priority)}">${a.priority}</span></td>
+            <td>${a.status === 'closed' ? `<span class="badge-ok">✓ Completata</span>` : `<span class="badge-err">● Aperta</span>`}</td>
+            <td>${a.status === 'closed' ? `${a.closed_by || '—'}${a.closed_at ? `<br><span style="font-size:11px;color:#64748b">${a.closed_at}</span>` : ''}` : '—'}</td>
+          </tr>`).join('')}
+          </tbody></table>`
+      }
+    </div>
+
+    <div class="section">
+      <h2>Chiusura formale</h2>
+      ${inc.hse_signed_by
+        ? `<div class="grid2" style="margin-bottom:8px">
+            <div class="field"><div class="lbl">HSE Manager</div><div class="val">${inc.hse_signed_by}</div></div>
+            <div class="field"><div class="lbl">Data chiusura</div><div class="val">${inc.hse_signed_date || '—'}</div></div>
+          </div>
+          <div class="badge-ok">✓ Azioni correttive confermate complete · Caso formalmente chiuso</div>`
+        : `<p class="badge-err">⚠ Chiusura formale non completata${inc.status === 'open' ? ' — caso ancora aperto' : ''}</p>`
+      }
+    </div>
+
+    <div class="section">
+      <h2>Timeline workflow</h2>
+      <div class="timeline">
+        <div class="tl done"><b>Incidente segnalato</b> · ${inc.date} · da ${inc.reported_by}</div>
+        ${inc.assignee ? `<div class="tl done"><b>Caso assegnato</b> · ${inc.assignee_date || '—'} · a ${inc.assignee}</div>` : `<div class="tl"><span style="color:#94a3b8">Nessun responsabile assegnato</span></div>`}
+        ${inc.root_cause ? `<div class="tl done"><b>Indagine completata</b> · causa radice identificata</div>` : `<div class="tl"><span style="color:#94a3b8">Indagine non completata</span></div>`}
+        ${incActions.length > 0 ? `<div class="tl ${openAct.length === 0 ? 'done' : ''}"><b>${closedAct.length}/${incActions.length} azioni correttive</b> completate</div>` : `<div class="tl"><span style="color:#94a3b8">Nessuna azione correttiva</span></div>`}
+        ${inc.hse_signed_by ? `<div class="tl done"><b>Chiusura formale</b> · ${inc.hse_signed_date} · ${inc.hse_signed_by}</div>` : `<div class="tl"><span style="color:#94a3b8">Chiusura formale non eseguita</span></div>`}
+      </div>
+    </div>
+
+    <div class="footer">
+      FieldSafe HSE Management System &middot; Report generato il ${new Date().toLocaleDateString('it-IT', {year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'})} &middot; ID: ${inc.id}
+    </div>
+    </body></html>`
+  }
+
   function handlePrintIncident(inc) {
     const incActions = getActionsForIncident(inc.id)
-    const w = window.open('', '_blank', 'width=820,height=700')
-    w.document.write(`<!DOCTYPE html><html><head><title>Incident Report — ${inc.date}</title>
-    <style>
-      body{font-family:Arial,sans-serif;padding:40px;color:#111;font-size:14px}
-      h1{font-size:22px;margin:0 0 4px}
-      .meta{color:#666;font-size:13px;margin-bottom:28px}
-      h2{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#555;border-bottom:1px solid #ddd;padding-bottom:5px;margin:24px 0 12px}
-      .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;margin-bottom:8px}
-      .label{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}
-      .value{font-size:14px;font-weight:600}
-      .desc{background:#f5f5f5;padding:14px;border-radius:6px;line-height:1.6;white-space:pre-wrap}
-      table{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px}
-      th{text-align:left;padding:6px 8px;background:#f0f0f0;font-size:11px}
-      td{padding:7px 8px;border-bottom:1px solid #eee}
-      .warn{background:#fff8e1;border-left:3px solid #f59e0b;padding:10px 14px;border-radius:4px;font-size:12px;margin-bottom:12px}
-      .footer{margin-top:40px;padding-top:14px;border-top:1px solid #ddd;font-size:11px;color:#aaa;text-align:center}
-      @media print{body{padding:20px}}
-    </style></head><body>
-    <h1>Incident Report</h1>
-    <div class="meta">${inc.type} &middot; ${inc.severity} severity &middot; Reported ${inc.date} &middot; Status: ${inc.status}</div>
-    <h2>Incident Details</h2>
-    <div class="grid">
-      <div><div class="label">Date</div><div class="value">${inc.date}</div></div>
-      <div><div class="label">Location</div><div class="value">${inc.location}</div></div>
-      <div><div class="label">Reported By</div><div class="value">${inc.reported_by}</div></div>
-      ${inc.ns_ohs_class ? `<div><div class="label">NS OHS Classification</div><div class="value">${inc.ns_ohs_class}</div></div>` : ''}
-    </div>
-    ${inc.notification_required ? `<div class="warn">⚠ Regulatory notification required: ${inc.notification_deadline}</div>` : ''}
-    <h2>Description</h2>
-    <div class="desc">${inc.description}</div>
-    ${inc.root_cause ? `
-    <h2>Investigation</h2>
-    <div class="grid">
-      <div style="grid-column:1/-1"><div class="label">Root Cause</div><div class="value" style="font-weight:400;margin-top:4px">${inc.root_cause}</div></div>
-      ${inc.contributing_factors ? `<div style="grid-column:1/-1"><div class="label">Contributing Factors</div><div class="value" style="font-weight:400;margin-top:4px">${inc.contributing_factors}</div></div>` : ''}
-      ${inc.witnesses ? `<div><div class="label">Witnesses</div><div class="value">${inc.witnesses}</div></div>` : ''}
-      ${inc.investigation_notes ? `<div style="grid-column:1/-1"><div class="label">Investigation Notes</div><div class="value" style="font-weight:400;margin-top:4px">${inc.investigation_notes}</div></div>` : ''}
-    </div>` : ''}
-    ${incActions.length > 0 ? `
-    <h2>Corrective Actions (${incActions.length})</h2>
-    <table><thead><tr><th>Description</th><th>Assigned To</th><th>Due Date</th><th>Priority</th><th>Status</th></tr></thead><tbody>
-      ${incActions.map(a => `<tr><td>${a.description}</td><td>${a.assigned_to}</td><td>${a.due_date}</td><td>${a.priority}</td><td>${a.status}</td></tr>`).join('')}
-    </tbody></table>` : ''}
-    ${inc.hse_signed_by ? `
-    <h2>Formal Closure</h2>
-    <div class="grid">
-      <div><div class="label">Signed By</div><div class="value">${inc.hse_signed_by}</div></div>
-      <div><div class="label">Closure Date</div><div class="value">${inc.hse_signed_date}</div></div>
-    </div>` : ''}
-    <div class="footer">FieldSafe HSE Management System &middot; Generated ${new Date().toLocaleDateString()}</div>
-    </body></html>`)
+    const w = window.open('', '_blank', 'width=860,height=700')
+    w.document.write(buildReportHTML(inc, incActions, false))
     w.document.close()
     setTimeout(() => w.print(), 400)
+  }
+
+  function handleExportIncident(inc) {
+    const incActions = getActionsForIncident(inc.id)
+    const w = window.open('', '_blank', 'width=860,height=720')
+    w.document.write(buildReportHTML(inc, incActions, true))
+    w.document.close()
+  }
+
+  function getHSEAdvice() {
+    const advice = []
+    const openInc = incidents.filter(i => i.status === 'open')
+    const unassigned = openInc.filter(i => !i.assignee)
+    const noInvestigation = openInc.filter(i => i.assignee && !i.root_cause)
+    const noActions = openInc.filter(i => i.assignee && i.root_cause && getActionsForIncident(i.id).length === 0)
+    const criticalOpen = openInc.filter(i => i.severity === 'Critical' || i.severity === 'High')
+    const notifRequired = openInc.filter(i => i.notification_required)
+    const stale = openInc.filter(i => {
+      const days = Math.floor((new Date() - new Date(i.date)) / 86400000)
+      return days > 14 && !i.hse_signed_by
+    })
+    if (notifRequired.length > 0)
+      advice.push({ level: 'critical', icon: '⚠', text: `${notifRequired.length} incident${notifRequired.length > 1 ? 's' : ''} require regulatory notification — verify deadlines are met.` })
+    if (unassigned.length > 0)
+      advice.push({ level: 'warn', icon: '👤', text: `${unassigned.length} open incident${unassigned.length > 1 ? 's have' : ' has'} no responsible person assigned. Assign a case manager to start the workflow.` })
+    if (overdueActions.length > 0)
+      advice.push({ level: 'warn', icon: '📋', text: `${overdueActions.length} corrective action${overdueActions.length > 1 ? 's are' : ' is'} overdue. Delayed actions increase liability exposure.` })
+    if (noInvestigation.length > 0)
+      advice.push({ level: 'info', icon: '🔍', text: `${noInvestigation.length} incident${noInvestigation.length > 1 ? 's are' : ' is'} assigned but root cause analysis is not complete. Complete the investigation phase.` })
+    if (noActions.length > 0)
+      advice.push({ level: 'info', icon: '🛠', text: `${noActions.length} investigated incident${noActions.length > 1 ? 's have' : ' has'} no corrective actions. Add actions to prevent recurrence.` })
+    if (criticalOpen.length > 0)
+      advice.push({ level: 'warn', icon: '🔴', text: `${criticalOpen.length} High/Critical severity incident${criticalOpen.length > 1 ? 's are' : ' is'} still open. Prioritise closure of high-risk cases.` })
+    if (stale.length > 0)
+      advice.push({ level: 'info', icon: '⏱', text: `${stale.length} incident${stale.length > 1 ? 's have' : ' has'} been open for more than 14 days. Review and progress to closure.` })
+    return advice
   }
 
   const sevPill = { Low: 'pill-green', Medium: 'pill-amber', High: 'pill-orange', Critical: 'pill-red' }
@@ -319,6 +430,34 @@ export default function Incidents() {
           </div>
         ))}
       </div>
+
+      {/* HSE ADVICE */}
+      {(() => {
+        const advice = getHSEAdvice()
+        if (advice.length === 0) return null
+        return (
+          <div style={{ marginBottom: 16, border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+            <div style={{ padding: '8px 14px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px', color: 'var(--text-3)' }}>HSE Advisor</span>
+              <span style={{ fontSize: 10, color: 'var(--text-3)' }}>· {advice.length} action{advice.length > 1 ? 's' : ''} recommended</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {advice.map((a, i) => (
+                <div key={i} style={{
+                  padding: '9px 14px',
+                  borderBottom: i < advice.length - 1 ? '1px solid var(--border)' : 'none',
+                  display: 'flex', alignItems: 'flex-start', gap: 10,
+                  background: a.level === 'critical' ? 'rgba(220,38,38,0.04)' : a.level === 'warn' ? 'rgba(245,158,11,0.04)' : 'var(--surface)',
+                  borderLeft: `3px solid ${a.level === 'critical' ? 'var(--red)' : a.level === 'warn' ? 'var(--amber)' : 'var(--primary)'}`,
+                }}>
+                  <span style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>{a.icon}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.5 }}>{a.text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* TABS */}
       <div className="tabs">
@@ -428,8 +567,8 @@ export default function Incidents() {
                 <th>Type</th>
                 <th>Description</th>
                 <th>Severity</th>
-                <th>Actions</th>
-                <th>NS OHS Class</th>
+                <th>{tab === 'closed' ? 'Actions Done' : 'Actions'}</th>
+                <th>{tab === 'closed' ? 'Closed By' : 'NS OHS Class'}</th>
                 <th>Status</th>
                 <th></th>
               </tr>
@@ -466,38 +605,67 @@ export default function Incidents() {
                       </td>
                       <td><span className={`pill ${sevPill[inc.severity] || 'pill-gray'}`}>{inc.severity}</span></td>
                       <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ fontSize: 12, color: overdueAct.length > 0 ? 'var(--red)' : openAct.length > 0 ? 'var(--amber)' : 'var(--text-3)' }}>
-                            {incActions.length === 0 ? '—' : `${openAct.length} open`}
-                          </span>
-                          {overdueAct.length > 0 && <span className="pill pill-red" style={{ fontSize: 9 }}>OVERDUE</span>}
-                        </div>
-                      </td>
-                      <td>
-                        {inc.ns_ohs_class ? (
-                          <div>
-                            <div style={{ fontSize: 11, fontWeight: 600, color: inc.notification_required ? 'var(--red)' : 'var(--text-2)', marginBottom: 2 }}>
-                              {inc.ns_ohs_class}
+                        {tab === 'closed' ? (
+                          <div style={{ fontSize: 11 }}>
+                            <div style={{ fontWeight: 600, color: 'var(--green)' }}>
+                              {incActions.length === 0 ? '—' : `${incActions.filter(a => a.status === 'closed').length}/${incActions.length} done`}
                             </div>
-                            {inc.notification_required && (
-                              <div style={{ fontSize: 10, color: 'var(--orange)', fontWeight: 600 }}>⚠ {inc.notification_deadline}</div>
-                            )}
-                            {!inc.notification_required && (
-                              <div style={{ fontSize: 10, color: 'var(--text-3)' }}>{inc.notification_deadline}</div>
-                            )}
                           </div>
                         ) : (
-                          <span style={{ fontSize: 11, color: 'var(--text-3)' }}>—</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 12, color: overdueAct.length > 0 ? 'var(--red)' : openAct.length > 0 ? 'var(--amber)' : 'var(--text-3)' }}>
+                              {incActions.length === 0 ? '—' : `${openAct.length} open`}
+                            </span>
+                            {overdueAct.length > 0 && <span className="pill pill-red" style={{ fontSize: 9 }}>OVERDUE</span>}
+                          </div>
                         )}
                       </td>
                       <td>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                          <span className={`pill ${inc.status === 'open' ? 'pill-red' : 'pill-green'}`}>{inc.status === 'open' ? 'Open' : 'Closed'}</span>
-                          <span style={{ fontSize: 10, color: 'var(--text-3)', textAlign: 'center' }}>{doneCount}/4 phases</span>
-                        </div>
+                        {tab === 'closed' ? (
+                          inc.hse_signed_by ? (
+                            <div>
+                              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--green)' }}>{inc.hse_signed_by}</div>
+                              <div style={{ fontSize: 10, color: 'var(--text-3)' }}>{inc.hse_signed_date}</div>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic' }}>No formal sign-off</span>
+                          )
+                        ) : (
+                          inc.ns_ohs_class ? (
+                            <div>
+                              <div style={{ fontSize: 11, fontWeight: 600, color: inc.notification_required ? 'var(--red)' : 'var(--text-2)', marginBottom: 2 }}>
+                                {inc.ns_ohs_class}
+                              </div>
+                              {inc.notification_required && (
+                                <div style={{ fontSize: 10, color: 'var(--orange)', fontWeight: 600 }}>⚠ {inc.notification_deadline}</div>
+                              )}
+                              {!inc.notification_required && (
+                                <div style={{ fontSize: 10, color: 'var(--text-3)' }}>{inc.notification_deadline}</div>
+                              )}
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: 11, color: 'var(--text-3)' }}>—</span>
+                          )
+                        )}
+                      </td>
+                      <td>
+                        {tab === 'closed' ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <span className="pill pill-green">Closed</span>
+                            {inc.root_cause && <span style={{ fontSize: 10, color: 'var(--text-3)' }}>Investigated ✓</span>}
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            <span className={`pill ${inc.status === 'open' ? 'pill-red' : 'pill-green'}`}>{inc.status === 'open' ? 'Open' : 'Closed'}</span>
+                            <span style={{ fontSize: 10, color: doneCount < 4 ? 'var(--amber)' : 'var(--green)', textAlign: 'center', fontWeight: 600 }}>
+                              {doneCount}/4 phases
+                            </span>
+                          </div>
+                        )}
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: 4 }}>
+                          <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 11 }} onClick={() => setDetailIncident(inc)}>View</button>
                           {inc.status === 'open'
                             ? <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 11 }} onClick={() => handleClose(inc.id)}>Close</button>
                             : <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 11 }} onClick={() => handleReopen(inc.id)}>Reopen</button>
@@ -1056,8 +1224,11 @@ export default function Incidents() {
             )}
 
             <div className="modal-footer" style={{ paddingTop: 12, justifyContent: 'space-between' }}>
-              <button className="btn btn-primary" onClick={() => handlePrintIncident(detailIncident)}>Print / Export PDF</button>
-              <button className="btn btn-secondary" onClick={() => setDetailIncident(null)}>Close</button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn-secondary" style={{ fontSize: 12 }} onClick={() => handlePrintIncident(detailIncident)}>🖨 STAMPA</button>
+                <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={() => handleExportIncident(detailIncident)}>⬇ ESPORTA PDF</button>
+              </div>
+              <button className="btn btn-ghost" onClick={() => setDetailIncident(null)}>Chiudi</button>
             </div>
           </div>
         </div>

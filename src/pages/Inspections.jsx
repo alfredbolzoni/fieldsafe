@@ -160,68 +160,93 @@ export default function Inspections() {
     setDetailItems(prev => prev.map(i => i.id === itemId ? { ...i, note } : i))
   }
 
-  function handlePrintInspection(ins, insItems) {
-    const passed  = insItems.filter(i => i.result === 'pass').length
-    const failed  = insItems.filter(i => i.result === 'fail').length
+  function buildInspectionReportHTML(ins, insItems, exportMode = false) {
     const failedItems = insItems.filter(i => i.result === 'fail')
-    const w = window.open('', '_blank', 'width=820,height=700')
-    w.document.write(`<!DOCTYPE html><html><head><title>Inspection Report — ${ins.date}</title>
+    const passedItems = insItems.filter(i => i.result === 'pass')
+    const naItems     = insItems.filter(i => i.result === 'na')
+    const scoreColor  = (ins.score||0) >= 80 ? '#16a34a' : (ins.score||0) >= 60 ? '#d97706' : '#dc2626'
+    return `<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"><title>Inspection Report — ${ins.date}</title>
     <style>
-      body{font-family:Arial,sans-serif;padding:40px;color:#111;font-size:14px}
-      h1{font-size:22px;margin:0 0 4px}
-      .meta{color:#666;font-size:13px;margin-bottom:28px}
-      h2{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#555;border-bottom:1px solid #ddd;padding-bottom:5px;margin:24px 0 12px}
-      .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 24px}
-      .label{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}
-      .value{font-size:14px;font-weight:600}
-      .score-box{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:16px;background:#f5f5f5;border-radius:8px;text-align:center;margin-bottom:8px}
-      .score-num{font-size:32px;font-weight:800}
-      .score-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#888;margin-top:2px}
-      table{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px}
-      th{text-align:left;padding:6px 8px;background:#f0f0f0;font-size:11px}
-      td{padding:7px 8px;border-bottom:1px solid #eee;vertical-align:top}
+      *{box-sizing:border-box}
+      body{font-family:Arial,sans-serif;padding:40px;color:#111;font-size:13px;max-width:860px;margin:0 auto}
+      h1{font-size:22px;margin:0 0 6px;color:#0f172a}
+      .subtitle{color:#555;font-size:12px;padding-bottom:14px;border-bottom:2px solid #0f172a}
+      h2{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.9px;color:#64748b;border-bottom:1px solid #e2e8f0;padding-bottom:5px;margin:22px 0 10px}
+      .grid4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px 16px;margin-bottom:8px}
+      .lbl{font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
+      .val{font-size:13px;font-weight:700;color:#0f172a}
+      .score-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;text-align:center;margin-bottom:4px}
+      .score-num{font-size:30px;font-weight:800;line-height:1}
+      .score-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.6px;color:#64748b;margin-top:4px}
+      table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
+      th{text-align:left;padding:7px 10px;background:#f1f5f9;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#475569;border-bottom:2px solid #e2e8f0}
+      td{padding:8px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top}
       .item-fail{background:#fff5f5;border-left:3px solid #dc2626}
-      .note{font-size:11px;color:#888;font-style:italic;margin-top:3px}
-      .footer{margin-top:40px;padding-top:14px;border-top:1px solid #ddd;font-size:11px;color:#aaa;text-align:center}
-      @media print{body{padding:20px}}
+      .item-pass{background:#f0fff4}
+      .note{font-size:11px;color:#64748b;font-style:italic;margin-top:3px}
+      .badge-pass{color:#16a34a;font-weight:700}
+      .badge-fail{color:#dc2626;font-weight:700}
+      .badge-na{color:#94a3b8;font-weight:600}
+      .footer{margin-top:40px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:10px;color:#94a3b8;text-align:center}
+      .save-btn{display:block;width:100%;margin-bottom:20px;padding:12px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer}
+      @media print{.save-btn{display:none!important}body{padding:20px}}
     </style></head><body>
+    ${exportMode ? `<button class="save-btn" onclick="window.print()">⬇ Salva come PDF — usa "Salva in PDF" nel dialogo di stampa</button>` : ''}
     <h1>Site Inspection Report</h1>
-    <div class="meta">${typeLabel(ins.inspection_type)} &middot; ${ins.date} &middot; ${ins.location} &middot; Supervisor: ${ins.supervisor}</div>
-    <h2>Summary</h2>
-    <div class="score-box">
-      <div><div class="score-num" style="color:${(ins.score||0)>=80?'#16a34a':(ins.score||0)>=60?'#d97706':'#dc2626'}">${ins.score||0}%</div><div class="score-lbl">Score</div></div>
-      <div><div class="score-num" style="color:#16a34a">${ins.passed||0}</div><div class="score-lbl">Passed</div></div>
-      <div><div class="score-num" style="color:${(ins.failed||0)>0?'#dc2626':'#9ca3af'}">${ins.failed||0}</div><div class="score-lbl">Failed</div></div>
+    <div class="subtitle" style="display:flex;gap:16px;flex-wrap:wrap">
+      <span><b>Tipo:</b> ${typeLabel(ins.inspection_type)}</span>
+      <span><b>Data:</b> ${ins.date}</span>
+      <span><b>Luogo:</b> ${ins.location}</span>
+      <span><b>Stato:</b> <span style="color:${ins.status==='passed'||ins.status==='completed'?'#16a34a':ins.status==='failed'?'#dc2626':'#d97706'};font-weight:700">${(ins.status||'').toUpperCase()}</span></span>
     </div>
-    <div class="grid" style="margin-top:12px">
-      <div><div class="label">Inspector</div><div class="value">${ins.supervisor}</div></div>
-      <div><div class="label">Location</div><div class="value">${ins.location}</div></div>
-      <div><div class="label">Date</div><div class="value">${ins.date}</div></div>
-      <div><div class="label">Status</div><div class="value">${ins.status}</div></div>
+    <h2>Riepilogo punteggio</h2>
+    <div class="score-grid">
+      <div><div class="score-num" style="color:${scoreColor}">${ins.score||0}%</div><div class="score-lbl">Score</div></div>
+      <div><div class="score-num" style="color:#16a34a">${passedItems.length || ins.passed||0}</div><div class="score-lbl">Passati</div></div>
+      <div><div class="score-num" style="color:${failedItems.length>0?'#dc2626':'#9ca3af'}">${failedItems.length || ins.failed||0}</div><div class="score-lbl">Falliti</div></div>
+      <div><div class="score-num" style="color:#9ca3af">${naItems.length || ins.pending||0}</div><div class="score-lbl">N/A</div></div>
+    </div>
+    <h2>Informazioni ispezione</h2>
+    <div class="grid4">
+      <div><div class="lbl">Supervisore</div><div class="val">${ins.supervisor}</div></div>
+      <div><div class="lbl">Luogo</div><div class="val">${ins.location}</div></div>
+      <div><div class="lbl">Data</div><div class="val">${ins.date}</div></div>
+      <div><div class="lbl">Tipo</div><div class="val">${typeLabel(ins.inspection_type)}</div></div>
     </div>
     ${failedItems.length > 0 ? `
-    <h2>Failed Items (${failedItems.length})</h2>
-    <table><thead><tr><th>Category</th><th>Item</th><th>Note / Deficiency</th></tr></thead><tbody>
+    <h2>Elementi Non Conformi — ${failedItems.length} voci</h2>
+    <table><thead><tr><th>Categoria</th><th>Voce</th><th>Note / Difformità</th></tr></thead><tbody>
       ${failedItems.map(it => `<tr class="item-fail">
-        <td style="font-size:11px;color:#666">${it.category||''}</td>
-        <td><b>${it.label}</b>${it.sub?`<div class="note">${it.sub}</div>`:''}</td>
+        <td style="font-size:11px;color:#64748b;white-space:nowrap">${it.category||''}</td>
+        <td><div style="font-weight:600">${it.label}</div>${it.sub?`<div class="note">${it.sub}</div>`:''}</td>
         <td class="note">${it.note||'—'}</td>
       </tr>`).join('')}
-    </tbody></table>` : ''}
+    </tbody></table>` : `<h2>Elementi Non Conformi</h2><p style="color:#16a34a;font-weight:600;font-size:12px">✓ Nessun elemento non conforme.</p>`}
     ${insItems.length > 0 ? `
-    <h2>Full Checklist (${insItems.length} items)</h2>
-    <table><thead><tr><th>Category</th><th>Item</th><th>Result</th><th>Note</th></tr></thead><tbody>
-      ${insItems.map(it => `<tr style="${it.result==='fail'?'background:#fff5f5':it.result==='pass'?'background:#f0fff4':''}">
-        <td style="font-size:11px;color:#666">${it.category||''}</td>
-        <td>${it.label}</td>
-        <td style="font-weight:700;color:${it.result==='pass'?'#16a34a':it.result==='fail'?'#dc2626':'#9ca3af'}">${it.result==='pass'?'PASS':it.result==='fail'?'FAIL':it.result==='na'?'N/A':'PENDING'}</td>
+    <h2>Checklist Completa — ${insItems.length} voci</h2>
+    <table><thead><tr><th>Categoria</th><th>Voce</th><th>Risultato</th><th>Note</th></tr></thead><tbody>
+      ${insItems.map(it => `<tr class="${it.result==='fail'?'item-fail':it.result==='pass'?'item-pass':''}">
+        <td style="font-size:11px;color:#64748b;white-space:nowrap">${it.category||''}</td>
+        <td><div>${it.label}</div>${it.sub?`<div class="note">${it.sub}</div>`:''}</td>
+        <td>${it.result==='pass'?`<span class="badge-pass">✓ PASS</span>`:it.result==='fail'?`<span class="badge-fail">✗ FAIL</span>`:`<span class="badge-na">N/A</span>`}</td>
         <td class="note">${it.note||''}</td>
       </tr>`).join('')}
-    </tbody></table>` : '<p style="color:#888;font-style:italic">No checklist items on record for this inspection.</p>'}
-    <div class="footer">FieldSafe HSE Management System &middot; Generated ${new Date().toLocaleDateString()}</div>
-    </body></html>`)
+    </tbody></table>` : '<p style="color:#94a3b8;font-style:italic;font-size:12px">Nessuna voce checklist registrata.</p>'}
+    <div class="footer">FieldSafe HSE Management System &middot; Report generato il ${new Date().toLocaleDateString('it-IT', {year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'})} &middot; ID: ${ins.id}</div>
+    </body></html>`
+  }
+
+  function handlePrintInspection(ins, insItems) {
+    const w = window.open('', '_blank', 'width=860,height=700')
+    w.document.write(buildInspectionReportHTML(ins, insItems, false))
     w.document.close()
     setTimeout(() => w.print(), 400)
+  }
+
+  function handleExportInspection(ins, insItems) {
+    const w = window.open('', '_blank', 'width=860,height=720')
+    w.document.write(buildInspectionReportHTML(ins, insItems, true))
+    w.document.close()
   }
 
   async function setResult(itemId, result) {
@@ -845,9 +870,8 @@ export default function Inspections() {
                     Mark as Closed
                   </button>
                 )}
-                <button className="btn btn-primary" onClick={() => handlePrintInspection(detailInspection, detailItems)}>
-                  Print / Export PDF
-                </button>
+                <button className="btn btn-secondary" style={{ fontSize: 12 }} onClick={() => handlePrintInspection(detailInspection, detailItems)}>🖨 STAMPA</button>
+                <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={() => handleExportInspection(detailInspection, detailItems)}>⬇ ESPORTA PDF</button>
               </div>
               <button className="btn btn-ghost" onClick={() => setDetailInspection(null)}>Close</button>
             </div>

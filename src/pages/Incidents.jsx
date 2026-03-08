@@ -241,56 +241,56 @@ export default function Incidents() {
       .save-btn{display:block;width:100%;margin-bottom:20px;padding:12px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.3px}
       @media print{.save-btn{display:none!important}body{padding:20px}}
     </style></head><body>
-    ${exportMode ? `<button class="save-btn" onclick="window.print()">⬇ Salva come PDF — usa "Salva in PDF" nel dialogo di stampa</button>` : ''}
+    ${exportMode ? `<button class="save-btn" onclick="window.print()">⬇ Save as PDF — use "Save as PDF" in the print dialog</button>` : ''}
     <h1>Incident Report</h1>
     <div class="subtitle" style="display:flex;gap:16px;flex-wrap:wrap">
-      <span><b>Tipo:</b> ${inc.type}</span>
-      <span><b>Severità:</b> ${inc.severity}</span>
-      <span><b>Stato:</b> <span style="color:${inc.status==='closed'?'#16a34a':'#dc2626'};font-weight:700">${inc.status === 'closed' ? 'CHIUSO' : 'APERTO'}</span></span>
+      <span><b>Type:</b> ${inc.type}</span>
+      <span><b>Severity:</b> ${inc.severity}</span>
+      <span><b>Status:</b> <span style="color:${inc.status==='closed'?'#16a34a':'#dc2626'};font-weight:700">${inc.status === 'closed' ? 'CLOSED' : 'OPEN'}</span></span>
       ${inc.ns_ohs_class ? `<span><b>NS OHS:</b> ${inc.ns_ohs_class}</span>` : ''}
     </div>
 
     <div class="section">
-      <h2>Dettagli incidente</h2>
+      <h2>Incident Details</h2>
       <div class="grid3">
         <div class="field"><div class="lbl">Data</div><div class="val">${inc.date}</div></div>
         <div class="field"><div class="lbl">Luogo</div><div class="val">${inc.location}</div></div>
-        <div class="field"><div class="lbl">Segnalato da</div><div class="val">${inc.reported_by}</div></div>
-        ${inc.assignee ? `<div class="field"><div class="lbl">Responsabile caso</div><div class="val">${inc.assignee}</div></div>` : ''}
-        ${inc.assignee_date ? `<div class="field"><div class="lbl">Presa in carico</div><div class="val">${inc.assignee_date}</div></div>` : ''}
-        ${inc.ns_ohs_class ? `<div class="field"><div class="lbl">Classificazione</div><div class="val" style="color:${inc.notification_required?'#dc2626':'inherit'}">${inc.ns_ohs_class}</div></div>` : ''}
+        <div class="field"><div class="lbl">Reported By</div><div class="val">${inc.reported_by}</div></div>
+        ${inc.assignee ? `<div class="field"><div class="lbl">Case Manager</div><div class="val">${inc.assignee}</div></div>` : ''}
+        ${inc.assignee_date ? `<div class="field"><div class="lbl">Date Taken Over</div><div class="val">${inc.assignee_date}</div></div>` : ''}
+        ${inc.ns_ohs_class ? `<div class="field"><div class="lbl">NS OHS Classification</div><div class="val" style="color:${inc.notification_required?'#dc2626':'inherit'}">${inc.ns_ohs_class}</div></div>` : ''}
       </div>
     </div>
 
-    ${inc.notification_required ? `<div class="warn"><b>⚠ Notifica obbligatoria:</b> ${inc.notification_deadline}</div>` : ''}
+    ${inc.notification_required ? `<div class="warn"><b>⚠ Regulatory notification required:</b> ${inc.notification_deadline}</div>` : ''}
 
     <div class="section">
-      <h2>Descrizione</h2>
+      <h2>Description</h2>
       <div class="desc">${inc.description}</div>
     </div>
 
     ${(inc.root_cause || inc.contributing_factors || inc.witnesses || inc.investigation_notes) ? `
     <div class="section">
-      <h2>Indagine — Analisi causa radice</h2>
-      ${inc.root_cause ? `<div class="field" style="margin-bottom:10px"><div class="lbl">Causa Radice</div><div class="val-n">${inc.root_cause}</div></div>` : ''}
-      ${inc.contributing_factors ? `<div class="field" style="margin-bottom:10px"><div class="lbl">Fattori Contribuenti</div><div class="val-n">${inc.contributing_factors}</div></div>` : ''}
-      ${inc.witnesses ? `<div class="field" style="margin-bottom:10px"><div class="lbl">Testimoni</div><div class="val">${inc.witnesses}</div></div>` : ''}
-      ${inc.investigation_notes ? `<div class="field"><div class="lbl">Note di Indagine</div><div class="val-n">${inc.investigation_notes}</div></div>` : ''}
-    </div>` : `<div class="section"><h2>Indagine</h2><p style="color:#94a3b8;font-style:italic;font-size:12px">Indagine non ancora completata.</p></div>`}
+      <h2>Investigation — Root Cause Analysis</h2>
+      ${inc.root_cause ? `<div class="field" style="margin-bottom:10px"><div class="lbl">Root Cause</div><div class="val-n">${inc.root_cause}</div></div>` : ''}
+      ${inc.contributing_factors ? `<div class="field" style="margin-bottom:10px"><div class="lbl">Contributing Factors</div><div class="val-n">${inc.contributing_factors}</div></div>` : ''}
+      ${inc.witnesses ? `<div class="field" style="margin-bottom:10px"><div class="lbl">Witnesses</div><div class="val">${inc.witnesses}</div></div>` : ''}
+      ${inc.investigation_notes ? `<div class="field"><div class="lbl">Investigation Notes</div><div class="val-n">${inc.investigation_notes}</div></div>` : ''}
+    </div>` : `<div class="section"><h2>Investigation</h2><p style="color:#94a3b8;font-style:italic;font-size:12px">Investigation not yet complete.</p></div>`}
 
     <div class="section">
-      <h2>Azioni correttive — ${incActions.length} totali · ${closedAct.length} completate · ${openAct.length} aperte</h2>
+      <h2>Corrective Actions — ${incActions.length} total · ${closedAct.length} completed · ${openAct.length} open</h2>
       ${incActions.length === 0
-        ? `<p style="color:#94a3b8;font-style:italic;font-size:12px">Nessuna azione correttiva registrata.</p>`
+        ? `<p style="color:#94a3b8;font-style:italic;font-size:12px">No corrective actions recorded.</p>`
         : `<table>
-          <thead><tr><th>Descrizione</th><th>Assegnato a</th><th>Scadenza</th><th>Priorità</th><th>Stato</th><th>Chiusura</th></tr></thead>
+          <thead><tr><th>Description</th><th>Assigned To</th><th>Due Date</th><th>Priority</th><th>Status</th><th>Closure</th></tr></thead>
           <tbody>
           ${incActions.map(a => `<tr>
             <td><div style="font-weight:600;margin-bottom:2px">${a.description}</div>${a.notes ? `<div style="font-size:11px;color:#64748b">${a.notes}</div>` : ''}</td>
             <td style="font-weight:600">${a.assigned_to}</td>
             <td>${a.due_date}</td>
             <td><span class="pill ${pill(a.priority)}">${a.priority}</span></td>
-            <td>${a.status === 'closed' ? `<span class="badge-ok">✓ Completata</span>` : `<span class="badge-err">● Aperta</span>`}</td>
+            <td>${a.status === 'closed' ? `<span class="badge-ok">✓ Completed</span>` : `<span class="badge-err">● Open</span>`}</td>
             <td>${a.status === 'closed' ? `${a.closed_by || '—'}${a.closed_at ? `<br><span style="font-size:11px;color:#64748b">${a.closed_at}</span>` : ''}` : '—'}</td>
           </tr>`).join('')}
           </tbody></table>`
@@ -298,30 +298,30 @@ export default function Incidents() {
     </div>
 
     <div class="section">
-      <h2>Chiusura formale</h2>
+      <h2>Formal Closure</h2>
       ${inc.hse_signed_by
         ? `<div class="grid2" style="margin-bottom:8px">
             <div class="field"><div class="lbl">HSE Manager</div><div class="val">${inc.hse_signed_by}</div></div>
-            <div class="field"><div class="lbl">Data chiusura</div><div class="val">${inc.hse_signed_date || '—'}</div></div>
+            <div class="field"><div class="lbl">Closure Date</div><div class="val">${inc.hse_signed_date || '—'}</div></div>
           </div>
-          <div class="badge-ok">✓ Azioni correttive confermate complete · Caso formalmente chiuso</div>`
-        : `<p class="badge-err">⚠ Chiusura formale non completata${inc.status === 'open' ? ' — caso ancora aperto' : ''}</p>`
+          <div class="badge-ok">✓ All corrective actions confirmed complete · Case formally closed</div>`
+        : `<p class="badge-err">⚠ Formal closure not completed${inc.status === 'open' ? ' — case still open' : ''}</p>`
       }
     </div>
 
     <div class="section">
-      <h2>Timeline workflow</h2>
+      <h2>Workflow Timeline</h2>
       <div class="timeline">
-        <div class="tl done"><b>Incidente segnalato</b> · ${inc.date} · da ${inc.reported_by}</div>
-        ${inc.assignee ? `<div class="tl done"><b>Caso assegnato</b> · ${inc.assignee_date || '—'} · a ${inc.assignee}</div>` : `<div class="tl"><span style="color:#94a3b8">Nessun responsabile assegnato</span></div>`}
-        ${inc.root_cause ? `<div class="tl done"><b>Indagine completata</b> · causa radice identificata</div>` : `<div class="tl"><span style="color:#94a3b8">Indagine non completata</span></div>`}
-        ${incActions.length > 0 ? `<div class="tl ${openAct.length === 0 ? 'done' : ''}"><b>${closedAct.length}/${incActions.length} azioni correttive</b> completate</div>` : `<div class="tl"><span style="color:#94a3b8">Nessuna azione correttiva</span></div>`}
-        ${inc.hse_signed_by ? `<div class="tl done"><b>Chiusura formale</b> · ${inc.hse_signed_date} · ${inc.hse_signed_by}</div>` : `<div class="tl"><span style="color:#94a3b8">Chiusura formale non eseguita</span></div>`}
+        <div class="tl done"><b>Incident reported</b> · ${inc.date} · da ${inc.reported_by}</div>
+        ${inc.assignee ? `<div class="tl done"><b>Case assigned</b> · ${inc.assignee_date || '—'} · to ${inc.assignee}</div>` : `<div class="tl"><span style="color:#94a3b8">No case manager assigned</span></div>`}
+        ${inc.root_cause ? `<div class="tl done"><b>Investigation completed · root cause identified</b></div>` : `<div class="tl"><span style="color:#94a3b8">Investigation not completed</span></div>`}
+        ${incActions.length > 0 ? `<div class="tl ${openAct.length === 0 ? 'done' : ''}"><b>${closedAct.length}/${incActions.length} corrective actions</b> completate</div>` : `<div class="tl"><span style="color:#94a3b8">No corrective actions</span></div>`}
+        ${inc.hse_signed_by ? `<div class="tl done"><b>Formal closure · ${inc.hse_signed_date} · ${inc.hse_signed_by}</b></div>` : `<div class="tl"><span style="color:#94a3b8">Formal closure not completed</span></div>`}
       </div>
     </div>
 
     <div class="footer">
-      FieldSafe HSE Management System &middot; Report generato il ${new Date().toLocaleDateString('it-IT', {year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'})} &middot; ID: ${inc.id}
+      FieldSafe HSE Management System &middot; Report generated ${new Date().toLocaleDateString('en-CA', {year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'})} &middot; ID: ${inc.id}
     </div>
     </body></html>`
   }

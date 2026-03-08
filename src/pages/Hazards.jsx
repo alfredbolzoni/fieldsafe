@@ -31,6 +31,7 @@ export default function Hazards() {
   const [editHazard, setEditHazard] = useState(null)
   const [tab, setTab] = useState('active')
   const [submitting, setSubmitting] = useState(false)
+  const [detailHazard, setDetailHazard] = useState(null)
 
   const emptyForm = {
     title: '', description: '', location: '', category: 'Physical',
@@ -85,13 +86,86 @@ export default function Hazards() {
   }
 
   function openEdit(hazard) {
-    setForm({ ...hazard })
+    const { title, description, location, category, likelihood, consequence, controls, responsible, review_date, status } = hazard
+    setForm({ title, description, location, category, likelihood, consequence, controls, responsible, review_date, status })
     setEditHazard(hazard)
     setShowForm(true)
   }
 
   function isOverdueReview(date) {
     return date && new Date(date) < new Date()
+  }
+
+  function buildHazardReportHTML(h, exportMode = false) {
+    const riskColor = { Critical: '#dc2626', High: '#ea580c', Medium: '#ca8a04', Low: '#16a34a' }[h.risk_level] || '#64748b'
+    return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Hazard Report — ${h.title}</title>
+    <style>
+      *{box-sizing:border-box}
+      body{font-family:Arial,sans-serif;padding:40px;color:#111;font-size:13px;max-width:820px;margin:0 auto}
+      h1{font-size:22px;margin:0 0 6px;color:#0f172a}
+      .subtitle{color:#555;font-size:12px;padding-bottom:14px;border-bottom:2px solid #0f172a;display:flex;gap:16px;flex-wrap:wrap}
+      h2{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.9px;color:#64748b;border-bottom:1px solid #e2e8f0;padding-bottom:5px;margin:22px 0 10px}
+      .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px 28px;margin-bottom:8px}
+      .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px 20px;margin-bottom:8px}
+      .lbl{font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
+      .val{font-size:13px;font-weight:700;color:#0f172a}
+      .val-n{font-size:13px;font-weight:400;color:#1e293b;line-height:1.55;white-space:pre-wrap}
+      .risk-badge{display:inline-block;padding:4px 14px;border-radius:6px;font-size:13px;font-weight:800;letter-spacing:.3px;color:#fff;background:${riskColor};margin-bottom:4px}
+      .score-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;text-align:center;margin-bottom:4px}
+      .score-num{font-size:22px;font-weight:800}
+      .score-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.6px;color:#64748b;margin-top:3px}
+      .controls-box{background:#f8fafc;border:1px solid #e2e8f0;padding:12px;border-radius:4px;line-height:1.6;white-space:pre-wrap;font-size:13px}
+      .footer{margin-top:40px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:10px;color:#94a3b8;text-align:center}
+      .save-btn{display:block;width:100%;margin-bottom:20px;padding:12px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer}
+      @media print{.save-btn{display:none!important}body{padding:20px}}
+    </style></head><body>
+    ${exportMode ? `<button class="save-btn" onclick="window.print()">⬇ Save as PDF — use "Save as PDF" in the print dialog</button>` : ''}
+    <h1>Hazard Report</h1>
+    <div class="subtitle">
+      <span><b>Category:</b> ${h.category}</span>
+      <span><b>Status:</b> ${h.status === 'active' ? 'Active' : 'Resolved'}</span>
+      <span><b>Risk Level:</b> <span style="color:${riskColor};font-weight:700">${h.risk_level}</span></span>
+    </div>
+
+    <h2>Hazard Details</h2>
+    <div class="grid3">
+      <div><div class="lbl">Location</div><div class="val">${h.location}</div></div>
+      <div><div class="lbl">Category</div><div class="val">${h.category}</div></div>
+      <div><div class="lbl">Review Date</div><div class="val" style="color:${h.review_date && new Date(h.review_date) < new Date() ? '#dc2626' : 'inherit'}">${h.review_date || '—'}</div></div>
+      <div><div class="lbl">Responsible</div><div class="val">${h.responsible}</div></div>
+      <div><div class="lbl">Status</div><div class="val">${h.status === 'active' ? 'Active' : 'Resolved'}</div></div>
+      <div><div class="lbl">Risk Level</div><div class="risk-badge">${h.risk_level}</div></div>
+    </div>
+
+    <h2>Risk Assessment</h2>
+    <div class="score-row">
+      <div><div class="score-num" style="color:#64748b">${h.likelihood}</div><div class="score-lbl">Likelihood</div></div>
+      <div><div class="score-num" style="color:#64748b">${h.consequence}</div><div class="score-lbl">Consequence</div></div>
+      <div><div class="score-num" style="color:${riskColor}">${h.risk_level}</div><div class="score-lbl">Risk Level</div></div>
+    </div>
+
+    ${h.description ? `<h2>Description</h2><div class="controls-box">${h.description}</div>` : ''}
+
+    <h2>Controls in Place</h2>
+    <div class="controls-box">${h.controls || '—'}</div>
+
+    <div class="footer">
+      FieldSafe HSE Management System · Hazard Report generated ${new Date().toLocaleDateString('en-CA', {year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'})} · ID: ${h.id}
+    </div>
+    </body></html>`
+  }
+
+  function handlePrintHazard(h) {
+    const w = window.open('', '_blank', 'width=860,height=700')
+    w.document.write(buildHazardReportHTML(h, false))
+    w.document.close()
+    setTimeout(() => w.print(), 400)
+  }
+
+  function handleExportHazard(h) {
+    const w = window.open('', '_blank', 'width=860,height=720')
+    w.document.write(buildHazardReportHTML(h, true))
+    w.document.close()
   }
 
   const filtered = tab === 'active'
@@ -207,7 +281,10 @@ export default function Hazards() {
               {filtered.map(h => (
                 <tr key={h.id}>
                   <td>
-                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 2 }}>{h.title}</div>
+                    <div
+                      onClick={() => setDetailHazard(h)}
+                      style={{ fontSize: 12, fontWeight: 600, marginBottom: 2, cursor: 'pointer', color: 'var(--primary)', textDecoration: 'underline' }}
+                    >{h.title}</div>
                     {h.description && <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{h.description.slice(0, 50)}{h.description.length > 50 ? '...' : ''}</div>}
                   </td>
                   <td><span className="pill pill-blue">{h.category}</span></td>
@@ -236,6 +313,7 @@ export default function Hazards() {
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: 4 }}>
+                      <button className="btn btn-ghost" style={{ padding: '3px 8px', fontSize: 10 }} onClick={() => setDetailHazard(h)}>View</button>
                       <button className="btn btn-ghost" style={{ padding: '3px 8px', fontSize: 10 }} onClick={() => openEdit(h)}>Edit</button>
                       {h.status === 'active'
                         ? <button className="btn btn-ghost" style={{ padding: '3px 8px', fontSize: 10 }} onClick={() => handleClose(h.id)}>Resolve</button>
@@ -323,6 +401,81 @@ export default function Hazards() {
               <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting}>
                 {submitting ? 'Saving...' : editHazard ? 'Update Hazard' : 'Register Hazard'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* HAZARD DETAIL MODAL */}
+      {detailHazard && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setDetailHazard(null)}>
+          <div className="modal" style={{ maxWidth: 580 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+              <div>
+                <div className="modal-title" style={{ marginBottom: 4 }}>{detailHazard.title}</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <span className="pill pill-blue">{detailHazard.category}</span>
+                  <span className={`pill ${getRiskPill(detailHazard.risk_level)}`} style={{ fontWeight: 700 }}>{detailHazard.risk_level} Risk</span>
+                  <span className={`pill ${detailHazard.status === 'active' ? 'pill-green' : 'pill-gray'}`}>{detailHazard.status === 'active' ? 'Active' : 'Resolved'}</span>
+                </div>
+              </div>
+              <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 18, lineHeight: 1 }} onClick={() => setDetailHazard(null)}>×</button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 3 }}>Location</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{detailHazard.location}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 3 }}>Responsible</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{detailHazard.responsible}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 3 }}>Likelihood</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{detailHazard.likelihood}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 3 }}>Consequence</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{detailHazard.consequence}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 3 }}>Review Date</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: isOverdueReview(detailHazard.review_date) && detailHazard.status === 'active' ? 'var(--red)' : 'var(--text-1)' }}>
+                  {detailHazard.review_date || '—'}
+                  {isOverdueReview(detailHazard.review_date) && detailHazard.status === 'active' && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--red)', fontWeight: 700 }}>OVERDUE</span>}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 3 }}>Risk Level</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: getRiskColor(detailHazard.risk_level) }}>{detailHazard.risk_level}</div>
+              </div>
+            </div>
+
+            {detailHazard.description && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6 }}>Description</div>
+                <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text-1)', background: 'var(--surface-2)', borderRadius: 6, padding: '10px 14px', whiteSpace: 'pre-wrap' }}>
+                  {detailHazard.description}
+                </div>
+              </div>
+            )}
+
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6 }}>Controls in Place</div>
+              <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text-1)', background: 'var(--surface-2)', borderRadius: 6, padding: '10px 14px', whiteSpace: 'pre-wrap' }}>
+                {detailHazard.controls}
+              </div>
+            </div>
+
+            <div className="modal-footer" style={{ paddingTop: 12, justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn-secondary" style={{ fontSize: 12 }} onClick={() => handlePrintHazard(detailHazard)}>🖨 PRINT</button>
+                <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={() => handleExportHazard(detailHazard)}>⬇ EXPORT PDF</button>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => { setDetailHazard(null); openEdit(detailHazard) }}>Edit</button>
+                <button className="btn btn-ghost" onClick={() => setDetailHazard(null)}>Close</button>
+              </div>
             </div>
           </div>
         </div>

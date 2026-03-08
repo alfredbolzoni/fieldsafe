@@ -191,48 +191,48 @@ export default function Inspections() {
       .save-btn{display:block;width:100%;margin-bottom:20px;padding:12px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer}
       @media print{.save-btn{display:none!important}body{padding:20px}}
     </style></head><body>
-    ${exportMode ? `<button class="save-btn" onclick="window.print()">⬇ Salva come PDF — usa "Salva in PDF" nel dialogo di stampa</button>` : ''}
+    ${exportMode ? `<button class="save-btn" onclick="window.print()">⬇ Save as PDF — use "Save as PDF" in the print dialog</button>` : ''}
     <h1>Site Inspection Report</h1>
     <div class="subtitle" style="display:flex;gap:16px;flex-wrap:wrap">
-      <span><b>Tipo:</b> ${typeLabel(ins.inspection_type)}</span>
-      <span><b>Data:</b> ${ins.date}</span>
-      <span><b>Luogo:</b> ${ins.location}</span>
-      <span><b>Stato:</b> <span style="color:${ins.status==='passed'||ins.status==='completed'?'#16a34a':ins.status==='failed'?'#dc2626':'#d97706'};font-weight:700">${(ins.status||'').toUpperCase()}</span></span>
+      <span><b>Type:</b> ${typeLabel(ins.inspection_type)}</span>
+      <span><b>Date:</b> ${ins.date}</span>
+      <span><b>Location:</b> ${ins.location}</span>
+      <span><b>Status:</b> <span style="color:${ins.status==='passed'||ins.status==='completed'?'#16a34a':ins.status==='failed'?'#dc2626':'#d97706'};font-weight:700">${(ins.status||'').toUpperCase()}</span></span>
     </div>
-    <h2>Riepilogo punteggio</h2>
+    <h2>Score Summary</h2>
     <div class="score-grid">
       <div><div class="score-num" style="color:${scoreColor}">${ins.score||0}%</div><div class="score-lbl">Score</div></div>
-      <div><div class="score-num" style="color:#16a34a">${passedItems.length || ins.passed||0}</div><div class="score-lbl">Passati</div></div>
-      <div><div class="score-num" style="color:${failedItems.length>0?'#dc2626':'#9ca3af'}">${failedItems.length || ins.failed||0}</div><div class="score-lbl">Falliti</div></div>
+      <div><div class="score-num" style="color:#16a34a">${passedItems.length || ins.passed||0}</div><div class="score-lbl">Passed</div></div>
+      <div><div class="score-num" style="color:${failedItems.length>0?'#dc2626':'#9ca3af'}">${failedItems.length || ins.failed||0}</div><div class="score-lbl">Failed</div></div>
       <div><div class="score-num" style="color:#9ca3af">${naItems.length || ins.pending||0}</div><div class="score-lbl">N/A</div></div>
     </div>
-    <h2>Informazioni ispezione</h2>
+    <h2>Inspection Details</h2>
     <div class="grid4">
-      <div><div class="lbl">Supervisore</div><div class="val">${ins.supervisor}</div></div>
-      <div><div class="lbl">Luogo</div><div class="val">${ins.location}</div></div>
-      <div><div class="lbl">Data</div><div class="val">${ins.date}</div></div>
-      <div><div class="lbl">Tipo</div><div class="val">${typeLabel(ins.inspection_type)}</div></div>
+      <div><div class="lbl">Supervisor</div><div class="val">${ins.supervisor}</div></div>
+      <div><div class="lbl">Location</div><div class="val">${ins.location}</div></div>
+      <div><div class="lbl">Date</div><div class="val">${ins.date}</div></div>
+      <div><div class="lbl">Type</div><div class="val">${typeLabel(ins.inspection_type)}</div></div>
     </div>
     ${failedItems.length > 0 ? `
-    <h2>Elementi Non Conformi — ${failedItems.length} voci</h2>
-    <table><thead><tr><th>Categoria</th><th>Voce</th><th>Note / Difformità</th></tr></thead><tbody>
+    <h2>Non-Conformities — ${failedItems.length} items</h2>
+    <table><thead><tr><th>Category</th><th>Item</th><th>Notes / Deficiency</th></tr></thead><tbody>
       ${failedItems.map(it => `<tr class="item-fail">
         <td style="font-size:11px;color:#64748b;white-space:nowrap">${it.category||''}</td>
         <td><div style="font-weight:600">${it.label}</div>${it.sub?`<div class="note">${it.sub}</div>`:''}</td>
         <td class="note">${it.note||'—'}</td>
       </tr>`).join('')}
-    </tbody></table>` : `<h2>Elementi Non Conformi</h2><p style="color:#16a34a;font-weight:600;font-size:12px">✓ Nessun elemento non conforme.</p>`}
+    </tbody></table>` : `<h2>Non-Conformities</h2><p style="color:#16a34a;font-weight:600;font-size:12px">✓ No non-conformities found.</p>`}
     ${insItems.length > 0 ? `
-    <h2>Checklist Completa — ${insItems.length} voci</h2>
-    <table><thead><tr><th>Categoria</th><th>Voce</th><th>Risultato</th><th>Note</th></tr></thead><tbody>
+    <h2>Full Checklist — ${insItems.length} items</h2>
+    <table><thead><tr><th>Category</th><th>Item</th><th>Result</th><th>Notes</th></tr></thead><tbody>
       ${insItems.map(it => `<tr class="${it.result==='fail'?'item-fail':it.result==='pass'?'item-pass':''}">
         <td style="font-size:11px;color:#64748b;white-space:nowrap">${it.category||''}</td>
         <td><div>${it.label}</div>${it.sub?`<div class="note">${it.sub}</div>`:''}</td>
         <td>${it.result==='pass'?`<span class="badge-pass">✓ PASS</span>`:it.result==='fail'?`<span class="badge-fail">✗ FAIL</span>`:`<span class="badge-na">N/A</span>`}</td>
         <td class="note">${it.note||''}</td>
       </tr>`).join('')}
-    </tbody></table>` : '<p style="color:#94a3b8;font-style:italic;font-size:12px">Nessuna voce checklist registrata.</p>'}
-    <div class="footer">FieldSafe HSE Management System &middot; Report generato il ${new Date().toLocaleDateString('it-IT', {year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'})} &middot; ID: ${ins.id}</div>
+    </tbody></table>` : '<p style="color:#94a3b8;font-style:italic;font-size:12px">No checklist items on record.</p>'}
+    <div class="footer">FieldSafe HSE Management System &middot; Report generated ${new Date().toLocaleDateString('en-CA', {year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'})} &middot; ID: ${ins.id}</div>
     </body></html>`
   }
 
